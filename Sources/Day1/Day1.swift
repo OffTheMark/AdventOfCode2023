@@ -71,9 +71,8 @@ extension Commands {
             
             func digits(in input: String) -> [Int] {
                 var result = [Int]()
-                var index = input.startIndex
                 
-                while index < input.endIndex {
+                for index in input.indices {
                     let distanceFromStartIndex = input.distance(from: input.startIndex, to: index)
                     
                     let matchedDigit = digitsByText.first(where: { key, _ in
@@ -88,8 +87,6 @@ extension Commands {
                     if let matchedDigit {
                         result.append(matchedDigit.value)
                     }
-                    
-                    input.formIndex(&index, offsetBy: 1)
                 }
                 
                 return result
