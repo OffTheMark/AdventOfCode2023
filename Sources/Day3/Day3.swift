@@ -63,34 +63,38 @@ extension Grid {
         var symbolsByPosition = [Point2D: Character]()
         
         for (y, line) in lines.enumerated() {
-            var currentNumber: (start: Point2D, rawValue: String)?
+            var currentNumber: Number?
             
             for (x, character) in line.enumerated() {
                 let position = Point2D(x: x, y: y)
                 
-                if character.isNumber {
+                if character.isNumber, let digit = Int(String(character)) {
                     if let current = currentNumber {
-                        currentNumber = (current.start, current.rawValue + String(character))
+                        currentNumber = Number(
+                            value: current.value * 10 + digit,
+                            positions: current.positions.union([position])
+                        )
                     }
                     else {
-                        currentNumber = (position, String(character))
+                        currentNumber = Number(value: digit, positions: [position])
                     }
                     
                     continue
                 }
                 
-                if let current = currentNumber, let value = Int(current.rawValue) {
-                    let deltas = 0 ..< current.rawValue.count
-                    let positions = Set(deltas.map({ current.start.applying(.init(deltaX: $0, deltaY: 0)) }))
-                    let number = Number(value: value, positions: positions)
-                    
-                    numbers.insert(number)
+                if let current = currentNumber {
+                    numbers.insert(current)
                     currentNumber = nil
                 }
                 
                 if character != "." {
                     symbolsByPosition[position] = character
                 }
+            }
+            
+            if let current = currentNumber {
+                numbers.insert(current)
+                currentNumber = nil
             }
         }
         
