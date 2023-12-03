@@ -8,7 +8,6 @@
 import Foundation
 import ArgumentParser
 import AdventOfCodeUtilities
-import RegexBuilder
 
 extension Commands {
     struct Day3: DayCommand {
@@ -28,11 +27,13 @@ extension Commands {
             printTitle("Part 1", level: .title1)
             let sumOfPartNumbers = part1(grid: grid)
             print("Sum of all the part numbers in the engine schematic:", sumOfPartNumbers, terminator: "\n\n")
+            
+            printTitle("Part 2", level: .title2)
+            let sumOfGearRatios = part2(grid: grid)
+            print("Sum of all of the gear ratios:", sumOfGearRatios)
         }
         
         private func part1(grid: Grid) -> Int {
-            var numbersNotPartNumbers = Set<Number>()
-            
             let sum = grid.numbers.reduce(into: 0, { sum, number in
                 let adjacentPoints = number.adjacentPoints()
                 let isPartNumber = adjacentPoints.contains(where: { point in
@@ -42,11 +43,31 @@ extension Commands {
                 if isPartNumber {
                     sum += number.value
                 }
-                else {
-                    numbersNotPartNumbers.insert(number)
-                }
             })
             
+            return sum
+        }
+        
+        private func part2(grid: Grid) -> Int {
+            let sum = grid.symbolsByPosition.reduce(into: 0, { sum, pair in
+                let (position, symbol) = pair
+                
+                guard symbol == "*" else {
+                    return
+                }
+                
+                let adjacentPoints = position.adjacentPoints(includingDiagonals: true)
+                let adjacentParts = grid.numbers.filter({ number in
+                    number.positions.intersects(with: adjacentPoints)
+                })
+                
+                if adjacentParts.count == 2 {
+                    let gearRatio = adjacentParts.reduce(into: 1, { product, part in
+                        product *= part.value
+                    })
+                    sum += gearRatio
+                }
+            })
             return sum
         }
     }
@@ -179,4 +200,10 @@ private extension Translation2D {
     static let downLeft = Self(deltaX: -1, deltaY: 1)
     static let left = Self(deltaX: -1, deltaY: 0)
     static let upLeft = Self(deltaX: -1, deltaY: -1)
+}
+
+extension Set {
+    func intersects(with other: Set<Element>) -> Bool {
+        contains(where: { other.contains($0) })
+    }
 }
