@@ -9,67 +9,65 @@ import Foundation
 import ArgumentParser
 import AdventOfCodeUtilities
 
-extension Commands {
-    struct Day3: DayCommand {
-        static var configuration: CommandConfiguration {
-            CommandConfiguration(
-                commandName: "day3",
-                abstract: "Solve day 3 puzzle"
-            )
-        }
+struct Day3: DayCommand {
+    static var configuration: CommandConfiguration {
+        CommandConfiguration(
+            commandName: "day3",
+            abstract: "Solve day 3 puzzle"
+        )
+    }
+    
+    @Argument(help: "Puzzle input path")
+    var puzzleInputPath: String
+    
+    func run() throws {
+        let grid = Grid(lines: try readLines())
         
-        @Argument(help: "Puzzle input path")
-        var puzzleInputPath: String
+        printTitle("Part 1", level: .title1)
+        let sumOfPartNumbers = part1(grid: grid)
+        print("Sum of all the part numbers in the engine schematic:", sumOfPartNumbers, terminator: "\n\n")
         
-        func run() throws {
-            let grid = Grid(lines: try readLines())
-            
-            printTitle("Part 1", level: .title1)
-            let sumOfPartNumbers = part1(grid: grid)
-            print("Sum of all the part numbers in the engine schematic:", sumOfPartNumbers, terminator: "\n\n")
-            
-            printTitle("Part 2", level: .title2)
-            let sumOfGearRatios = part2(grid: grid)
-            print("Sum of all of the gear ratios:", sumOfGearRatios)
-        }
-        
-        private func part1(grid: Grid) -> Int {
-            let sum = grid.numbers.reduce(into: 0, { sum, number in
-                let adjacentPoints = number.adjacentPoints()
-                let isPartNumber = adjacentPoints.contains(where: { point in
-                    grid.symbolsByPosition.keys.contains(point)
-                })
-                
-                if isPartNumber {
-                    sum += number.value
-                }
+        printTitle("Part 2", level: .title2)
+        let sumOfGearRatios = part2(grid: grid)
+        print("Sum of all of the gear ratios:", sumOfGearRatios)
+    }
+    
+    private func part1(grid: Grid) -> Int {
+        let sum = grid.numbers.reduce(into: 0, { sum, number in
+            let adjacentPoints = number.adjacentPoints()
+            let isPartNumber = adjacentPoints.contains(where: { point in
+                grid.symbolsByPosition.keys.contains(point)
             })
             
-            return sum
-        }
+            if isPartNumber {
+                sum += number.value
+            }
+        })
         
-        private func part2(grid: Grid) -> Int {
-            let sum = grid.symbolsByPosition.reduce(into: 0, { sum, pair in
-                let (position, symbol) = pair
-                
-                guard symbol == "*" else {
-                    return
-                }
-                
-                let adjacentPoints = position.adjacentPoints(includingDiagonals: true)
-                let adjacentParts = grid.numbers.filter({ number in
-                    number.positions.intersects(with: adjacentPoints)
-                })
-                
-                if adjacentParts.count == 2 {
-                    let gearRatio = adjacentParts.reduce(into: 1, { product, part in
-                        product *= part.value
-                    })
-                    sum += gearRatio
-                }
+        return sum
+    }
+    
+    private func part2(grid: Grid) -> Int {
+        let sum = grid.symbolsByPosition.reduce(into: 0, { sum, pair in
+            let (position, symbol) = pair
+            
+            guard symbol == "*" else {
+                return
+            }
+            
+            let adjacentPoints = position.adjacentPoints(includingDiagonals: true)
+            let adjacentParts = grid.numbers.filter({ number in
+                number.positions.intersects(with: adjacentPoints)
             })
-            return sum
-        }
+            
+            if adjacentParts.count == 2 {
+                let gearRatio = adjacentParts.reduce(into: 1, { product, part in
+                    product *= part.value
+                })
+                sum += gearRatio
+            }
+        })
+        return sum
     }
 }
 

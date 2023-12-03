@@ -10,53 +10,51 @@ import ArgumentParser
 import AdventOfCodeUtilities
 import RegexBuilder
 
-extension Commands {
-    struct Day2: DayCommand {
-        static var configuration: CommandConfiguration {
-            CommandConfiguration(
-                commandName: "day2",
-                abstract: "Solve day 2 puzzle"
-            )
-        }
+struct Day2: DayCommand {
+    static var configuration: CommandConfiguration {
+        CommandConfiguration(
+            commandName: "day2",
+            abstract: "Solve day 2 puzzle"
+        )
+    }
+    
+    @Argument(help: "Puzzle input path")
+    var puzzleInputPath: String
+    
+    func run() throws {
+        let games = try readLines().compactMap(Game.init)
         
-        @Argument(help: "Puzzle input path")
-        var puzzleInputPath: String
+        printTitle("Part 1", level: .title1)
+        let sumOfIDs = part1(games: games)
+        print("Sum of IDs:", sumOfIDs, terminator: "\n\n")
         
-        func run() throws {
-            let games = try readLines().compactMap(Game.init)
+        printTitle("Part 2", level: .title1)
+        let sumOfPowers = part2(games: games)
+        print("Sum of powers:", sumOfPowers)
+    }
+    
+    fileprivate func part1(games: [Game]) -> Int {
+        let possiblesContentsOfBag: [CubeColor: Int] = [
+            .red: 12,
+            .green: 13,
+            .blue: 14
+        ]
+        
+        return games.reduce(into: 0, { sum, game in
+            guard game.isPossible(with: possiblesContentsOfBag) else {
+                return
+            }
             
-            printTitle("Part 1", level: .title1)
-            let sumOfIDs = part1(games: games)
-            print("Sum of IDs:", sumOfIDs, terminator: "\n\n")
-            
-            printTitle("Part 2", level: .title1)
-            let sumOfPowers = part2(games: games)
-            print("Sum of powers:", sumOfPowers)
-        }
-        
-        fileprivate func part1(games: [Game]) -> Int {
-            let possiblesContentsOfBag: [CubeColor: Int] = [
-                .red: 12,
-                .green: 13,
-                .blue: 14
-            ]
-            
-            return games.reduce(into: 0, { sum, game in
-                guard game.isPossible(with: possiblesContentsOfBag) else {
-                    return
-                }
-                
-                sum += game.id
-            })
-        }
-        
-        fileprivate func part2(games: [Game]) -> Int {
-            return games.reduce(into: 0, { sum, game in
-                let minimumCountPerColor = game.minimumCountPerColor()
-                let power = minimumCountPerColor.values.reduce(1, *)
-                sum += power
-            })
-        }
+            sum += game.id
+        })
+    }
+    
+    fileprivate func part2(games: [Game]) -> Int {
+        return games.reduce(into: 0, { sum, game in
+            let minimumCountPerColor = game.minimumCountPerColor()
+            let power = minimumCountPerColor.values.reduce(1, *)
+            sum += power
+        })
     }
 }
 

@@ -14,16 +14,11 @@ struct AdventOfCode2023: ParsableCommand {
             abstract: "A program to solve Advent of Code 2023 puzzles",
             version: "0.0.1",
             subcommands: [
-                Commands.Day1.self,
-                Commands.Day2.self,
-                Commands.Day3.self,
+                Day1.self,
+                Day2.self,
+                Day3.self,
+                Day4.self,
             ]
         )
     }
-    
-    mutating func run() throws {
-        print("Hello, world!")
-    }
 }
-
-enum Commands {}
