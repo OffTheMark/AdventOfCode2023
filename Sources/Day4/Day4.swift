@@ -26,6 +26,10 @@ struct Day4: DayCommand {
         printTitle("Part 1", level: .title1)
         let totalPoints = part1(cards: cards)
         print("Total points:", totalPoints, terminator: "\n\n")
+        
+        printTitle("Part 2", level: .title1)
+        let totalNumberOfScratchCards = part2(cards: cards)
+        print("Total number of scratchcards:", totalNumberOfScratchCards)
     }
     
     func part1(cards: [Card]) -> Int {
@@ -35,23 +39,57 @@ struct Day4: DayCommand {
         return sum
     }
     
+    func part2(cards: [Card]) -> Int {
+        let cardsByID: [Int: Card] = cards.reduce(into: [:], { result, card in
+            result[card.id] = card
+        })
+        let winningCopiesPerID: [Int: Int] = cards.reduce(into: [:], { result, card in
+            result[card.id] = card.matchingNumberCount()
+        })
+        
+        var totalNumberOfScratchCards = cards.count
+        var currentCards = cards
+        
+        while !currentCards.isEmpty {
+            var nextCurrentCards = [Card]()
+            
+            for card in currentCards {
+                let winningNumberCount = winningCopiesPerID[card.id, default: 0]
+                
+                if winningNumberCount == 0 {
+                    continue
+                }
+                
+                let copiedCards = (1 ... winningNumberCount).map({ id in
+                    cardsByID[card.id + id]!
+                })
+                nextCurrentCards.append(contentsOf: copiedCards)
+            }
+            
+            currentCards = nextCurrentCards
+            totalNumberOfScratchCards += nextCurrentCards.count
+        }
+        
+        return totalNumberOfScratchCards
+    }
+    
     struct Card {
         let id: Int
         let winningNumbers: [Int]
         let drawnNumbers: [Int]
         
-        func drawnWinningNumberCount() -> Int {
+        func matchingNumberCount() -> Int {
             drawnNumbers.count(where: { winningNumbers.contains($0) })
         }
         
         func points() -> Int {
-            let winningNumberCount = drawnWinningNumberCount()
+            let matchingNumberCount = matchingNumberCount()
             
-            if winningNumberCount == 0 {
+            if matchingNumberCount == 0 {
                 return 0
             }
             
-            return pow(2, winningNumberCount - 1)
+            return pow(2, matchingNumberCount - 1)
         }
     }
 }
@@ -73,8 +111,12 @@ extension Day4.Card {
         }
         
         self.id = id
-        self.winningNumbers = setsOfNumbers[0].split(whereSeparator: { $0 == " " }).compactMap({ Int(String($0)) })
-        self.drawnNumbers = setsOfNumbers[1].split(whereSeparator: { $0 == " " }).compactMap({ Int(String($0)) })
+        self.winningNumbers = setsOfNumbers[0]
+            .split(whereSeparator: { $0 == " " })
+            .compactMap({ Int(String($0)) })
+        self.drawnNumbers = setsOfNumbers[1]
+            .split(whereSeparator: { $0 == " " })
+            .compactMap({ Int(String($0)) })
     }
 }
 
