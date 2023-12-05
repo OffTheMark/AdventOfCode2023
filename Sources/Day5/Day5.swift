@@ -76,6 +76,8 @@ struct Day5: DayCommand {
         let destination: Int
         let width: Int
         
+        var destinationOffset: Int { destination - source }
+        
         var sourceRange: Range<Int> {
             source ..< source + width
         }
@@ -102,7 +104,7 @@ extension Day5.Path {
             return nil
         }
         
-        let (_, source, destination) = match.output
+        let (_, destination, source) = match.output
         
         self.source = String(source)
         self.destination = String(destination)
