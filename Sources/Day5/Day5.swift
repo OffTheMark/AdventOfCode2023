@@ -7,6 +7,7 @@
 
 import Foundation
 import AdventOfCodeUtilities
+import Algorithms
 import ArgumentParser
 import RegexBuilder
 
@@ -28,71 +29,73 @@ struct Day5: DayCommand {
         printTitle("Part 1", level: .title1)
         let lowestLocation = part1(seeds: seeds, maps: maps)
         print("Lowest location that corresponds to any initial seed number:", lowestLocation, terminator: "\n\n")
+        
+        printTitle("Part 2", level: .title1)
+        let lowestLocationForSeedRanges = part2(seeds: seeds, maps: maps)
+        print("Lowest location that corresponds to any initial seed number range:", lowestLocationForSeedRanges)
+        
     }
     
-    private func parse(_ rawValue: String) -> (seeds: [Int], maps: [Path: [Transform]]) {
+    private func parse(_ rawValue: String) -> (seeds: [Int], maps: [Map]) {
         let blocks = rawValue.split(separator: "\n\n").map(String.init)
         
         let seeds = blocks[0].removingPrefix("seeds: ")
             .components(separatedBy: " ")
             .compactMap(Int.init)
         
-        let maps: [Path: [Transform]] = blocks.dropFirst().reduce(into: [:], { maps, block in
+        let maps: [Map] = blocks.dropFirst().compactMap({ block in
             let lines = block.components(separatedBy: .newlines)
             
             guard lines.count >= 2 else {
-                return
-            }
-            
-            guard let path = Path(rawValue: lines[0]) else {
-                return
+                return nil
             }
             
             let transforms = lines.dropFirst().compactMap(Transform.init)
-            
-            maps[path] = transforms
+            return Map(transforms: transforms)
         })
         
         return (seeds, maps)
     }
     
-    func part1(seeds: [Int], maps: [Path: [Transform]]) -> Int {
-        let destinationsBySource: [String: String] = maps.reduce(into: [:], { result, map in
-            result[map.key.source] = map.key.destination
-        })
-        
+    func part1(seeds: [Int], maps: [Map]) -> Int {
         return seeds.map({ seed -> Int in
-            location(forSeed: seed, maps: maps, destinationsBySource: destinationsBySource)
+            location(forSeed: seed, maps: maps)
         })
         .min()!
     }
     
-    private func location(
-        forSeed seed: Int,
-        maps: [Path: [Transform]],
-        destinationsBySource: [String: String]
-    )
-    -> Int {
-        var currentCategory = "seed"
-        var value = seed
+    func part2(seeds: [Int], maps: [Map]) -> Int {
+        // Adapted from Daniel Gauthier's Swift solution for day 5 part 2:
+        // https://github.com/danielmgauthier/advent-of-code-2023/blob/main/Sources/AdventOfCode2023/Day5.swift
+        let seedRanges: [Range<Int>] = seeds.chunks(ofCount: 2).map({ chunk in
+            let start = chunk.first!
+            let width = chunk.last!
+            return start ..< start + width
+        })
         
-        while currentCategory != "location" {
-            let destination = destinationsBySource[currentCategory]!
-            let transforms = maps[.init(source: currentCategory, destination: destination), default: []]
-            
-            if let transform = transforms.first(where: { $0.sourceRange.contains(value) }) {
-                value += transform.destinationOffset
-            }
-            
-            currentCategory = destination
+        var valueRanges = seedRanges
+        for map in maps {
+            let newRanges: [Range<Int>] = valueRanges.flatMap({ valueRange in
+                map.map(valueRange)
+            })
+            valueRanges = newRanges
         }
         
-        return value
+        return valueRanges.min(by: { $0.lowerBound < $1.lowerBound })!
+            .lowerBound
     }
     
-    struct Path: Hashable {
-        let source: String
-        let destination: String
+    private func location(
+        forSeed seed: Int,
+        maps: [Map]
+    ) -> Int {
+        maps.reduce(into: seed, { result, map in
+            result = map.map(result)
+        })
+    }
+    
+    struct Map {
+        let transforms: [Transform]
     }
     
     struct Transform {
@@ -103,33 +106,6 @@ struct Day5: DayCommand {
         var destinationOffset: Int { destinationStart - sourceStart }
         
         var sourceRange: Range<Int> { sourceStart ..< sourceStart + width }
-    }
-}
-
-extension Day5.Path {
-    private static let regex = Regex {
-        Capture {
-            OneOrMore(.word)
-        }
-        
-        "-to-"
-        
-        Capture {
-            OneOrMore(.word)
-        }
-        
-        " map:"
-    }
-    
-    init?(rawValue: String) {
-        guard let match = rawValue.firstMatch(of: Self.regex) else {
-            return nil
-        }
-        
-        let (_, source, destination) = match.output
-        
-        self.source = String(source)
-        self.destination = String(destination)
     }
 }
 
@@ -168,5 +144,56 @@ extension Day5.Transform {
         self.sourceStart = sourceStart
         self.destinationStart = destinationStart
         self.width = width
+    }
+}
+
+extension Day5.Map {
+    func map(_ value: Int) -> Int {
+        guard let transform = transforms.first(where: { $0.sourceRange.contains(value) }) else {
+            return value
+        }
+        
+        return value + transform.destinationOffset
+    }
+    
+    func map(_ range: Range<Int>) -> [Range<Int>] {
+        // Adapted from Daniel Gauthier's Swift solution for day 5 part 2:
+        // https://github.com/danielmgauthier/advent-of-code-2023/blob/main/Sources/AdventOfCode2023/Day5.swift
+        let sortedTransforms = transforms.sorted(by: { $0.sourceStart < $1.sourceStart })
+        var newRanges = [Range<Int>]()
+        
+        var currentRangeStart = range.lowerBound
+        while currentRangeStart < range.upperBound {
+            var newRange: Range<Int>
+            
+            // If the current range start is contained in a transform, we can simply offset
+            if let transform = sortedTransforms.first(where: { $0.sourceRange.contains(currentRangeStart) }) {
+                let upperBound = min(transform.sourceRange.upperBound, range.upperBound)
+                newRange = currentRangeStart ..< upperBound
+                
+                let transformedRange = newRange.offset(by: transform.destinationOffset)
+                newRanges.append(transformedRange)
+            }
+            else {
+                if let transform = sortedTransforms.first(where: { $0.sourceStart > currentRangeStart }) {
+                    newRange = currentRangeStart ..< transform.sourceStart
+                }
+                else {
+                    newRange = currentRangeStart ..< range.upperBound
+                }
+                
+                newRanges.append(newRange)
+            }
+            
+            currentRangeStart = newRange.upperBound
+        }
+        
+        return newRanges
+    }
+}
+
+extension Range<Int> {
+    func offset(by offset: Int) -> Range<Int> {
+        lowerBound + offset ..< upperBound + offset
     }
 }
