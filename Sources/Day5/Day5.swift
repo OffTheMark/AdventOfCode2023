@@ -99,13 +99,13 @@ struct Day5: DayCommand {
     }
     
     struct Transform {
-        let sourceStart: Int
-        let destinationStart: Int
+        let source: Int
+        let destination: Int
         let width: Int
         
-        var destinationOffset: Int { destinationStart - sourceStart }
+        var offset: Int { destination - source }
         
-        var sourceRange: Range<Int> { sourceStart ..< sourceStart + width }
+        var sourceRange: Range<Int> { source ..< source + width }
     }
 }
 
@@ -141,8 +141,8 @@ extension Day5.Transform {
         
         let (_, destinationStart, sourceStart, width) = match.output
         
-        self.sourceStart = sourceStart
-        self.destinationStart = destinationStart
+        self.source = sourceStart
+        self.destination = destinationStart
         self.width = width
     }
 }
@@ -153,39 +153,48 @@ extension Day5.Map {
             return value
         }
         
-        return value + transform.destinationOffset
+        return value + transform.offset
     }
     
     func map(_ range: Range<Int>) -> [Range<Int>] {
         // Adapted from Daniel Gauthier's Swift solution for day 5 part 2:
         // https://github.com/danielmgauthier/advent-of-code-2023/blob/main/Sources/AdventOfCode2023/Day5.swift
-        let sortedTransforms = transforms.sorted(by: { $0.sourceStart < $1.sourceStart })
+        let sortedTransforms = transforms.sorted(by: { $0.source < $1.source })
         var newRanges = [Range<Int>]()
         
-        var currentRangeStart = range.lowerBound
-        while currentRangeStart < range.upperBound {
-            var newRange: Range<Int>
+        var cursor = range.lowerBound
+        while cursor < range.upperBound {
+            let newRange: Range<Int>
             
-            // If the current range start is contained in a transform, we can simply offset
-            if let transform = sortedTransforms.first(where: { $0.sourceRange.contains(currentRangeStart) }) {
+            // If the current range start is contained in a transform, we can simply offset the part of the range
+            // that overlaps with the transform's range by the transform's offset.
+            if let transform = sortedTransforms.first(where: { $0.sourceRange.contains(cursor) }) {
+                // We move the cursor to the end of the transform's source range if it is included in the input range.
+                // If it's not we move to the end of the input range.
                 let upperBound = min(transform.sourceRange.upperBound, range.upperBound)
-                newRange = currentRangeStart ..< upperBound
+                newRange = cursor ..< upperBound
                 
-                let transformedRange = newRange.offset(by: transform.destinationOffset)
+                let transformedRange = newRange.offset(by: transform.offset)
                 newRanges.append(transformedRange)
             }
+            // If not, the current range start is not part of a transform. We try to find the next transform who
+            // overlaps with the remaining part of the input range.
             else {
-                if let transform = sortedTransforms.first(where: { $0.sourceStart > currentRangeStart }) {
-                    newRange = currentRangeStart ..< transform.sourceStart
+                // If there is such a range, we move up to the start of this range.
+                if let transform = sortedTransforms.first(where: {
+                    $0.sourceRange.overlaps(cursor ..< range.upperBound)
+                }) {
+                    newRange = cursor ..< transform.source
                 }
+                // If there is no such range, we move up to the end of the input range.
                 else {
-                    newRange = currentRangeStart ..< range.upperBound
+                    newRange = cursor ..< range.upperBound
                 }
                 
                 newRanges.append(newRange)
             }
             
-            currentRangeStart = newRange.upperBound
+            cursor = newRange.upperBound
         }
         
         return newRanges
