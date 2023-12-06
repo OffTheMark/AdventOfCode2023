@@ -160,11 +160,11 @@ extension Day5.Map {
         // Adapted from Daniel Gauthier's Swift solution for day 5 part 2:
         // https://github.com/danielmgauthier/advent-of-code-2023/blob/main/Sources/AdventOfCode2023/Day5.swift
         let sortedTransforms = transforms.sorted(by: { $0.source < $1.source })
-        var newRanges = [Range<Int>]()
+        var transformedRanges = [Range<Int>]()
         
         var cursor = range.lowerBound
         while cursor < range.upperBound {
-            let newRange: Range<Int>
+            let rangeWithSameOffset: Range<Int>
             
             // If the current range start is contained in a transform, we can simply offset the part of the range
             // that overlaps with the transform's range by the transform's offset.
@@ -172,10 +172,11 @@ extension Day5.Map {
                 // We move the cursor to the end of the transform's source range if it is included in the input range.
                 // If it's not we move to the end of the input range.
                 let upperBound = min(transform.sourceRange.upperBound, range.upperBound)
-                newRange = cursor ..< upperBound
+                rangeWithSameOffset = cursor ..< upperBound
                 
-                let transformedRange = newRange.offset(by: transform.offset)
-                newRanges.append(transformedRange)
+                // We offset the range with the same offset as the cursor and add it to the result.
+                let transformedRange = rangeWithSameOffset.offset(by: transform.offset)
+                transformedRanges.append(transformedRange)
             }
             // If not, the current range start is not part of a transform. We try to find the next transform who
             // overlaps with the remaining part of the input range.
@@ -184,20 +185,22 @@ extension Day5.Map {
                 if let transform = sortedTransforms.first(where: {
                     $0.sourceRange.overlaps(cursor ..< range.upperBound)
                 }) {
-                    newRange = cursor ..< transform.source
+                    rangeWithSameOffset = cursor ..< transform.source
                 }
                 // If there is no such range, we move up to the end of the input range.
                 else {
-                    newRange = cursor ..< range.upperBound
+                    rangeWithSameOffset = cursor ..< range.upperBound
                 }
                 
-                newRanges.append(newRange)
+                // We add the range with the same offset as the cursor to the result. This whole range does not change
+                // value with the current map.
+                transformedRanges.append(rangeWithSameOffset)
             }
             
-            cursor = newRange.upperBound
+            cursor = rangeWithSameOffset.upperBound
         }
         
-        return newRanges
+        return transformedRanges
     }
 }
 
