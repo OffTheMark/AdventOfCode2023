@@ -25,33 +25,26 @@ struct Day7: DayCommand {
         let hands = try readLines().compactMap(Hand.init)
         
         printTitle("Part 1", level: .title1)
-        let totalWinnings = part1(hands: hands)
-        print("Total winnings:", totalWinnings, terminator: "\n\n")
+        let totalWinningsWithFirstVariant = part1(hands: hands)
+        print("Total winnings with first variant:", totalWinningsWithFirstVariant, terminator: "\n\n")
+        
+        let totalWinningsWithSecondVariant = part2(hands: hands)
+        print("Total winnings with second variant:", totalWinningsWithSecondVariant)
     }
     
     func part1(hands: [Hand]) -> Int {
-        let sortedHands = hands.sorted(by: { left, right in
-            let leftHandType = left.handType()
-            let rightHandType = right.handType()
-            
-            if leftHandType < rightHandType {
-                return true
-            }
-            
-            if leftHandType > rightHandType {
-                return false
-            }
-            
-            for (leftCard, rightCard) in zip(left.cards, right.cards) {
-                if leftCard == rightCard {
-                    continue
-                }
-                
-                return leftCard < rightCard
-            }
-            
-            return false
+        let rule = FirstVariant()
+        let sortedHands = hands.sorted(by: rule.areInIncreasingOrder)
+        
+        return sortedHands.enumerated().reduce(into: 0, { totalWinnings, pair in
+            let (index, hand) = pair
+            totalWinnings += (index + 1) * hand.bid
         })
+    }
+    
+    func part2(hands: [Hand]) -> Int {
+        let rule = SecondVariant()
+        let sortedHands = hands.sorted(by: rule.areInIncreasingOrder)
         
         return sortedHands.enumerated().reduce(into: 0, { totalWinnings, pair in
             let (index, hand) = pair
@@ -64,36 +57,6 @@ struct Day7: DayCommand {
         
         let cards: [Card]
         let bid: Int
-        
-        func handType() -> HandType {
-            let countsByCard: [Card: Int] = cards.reduce(into: [:], { result, card in
-                result[card, default: 0] += 1
-            })
-            let orderedCounts = Array(countsByCard.values).sorted(by: >)
-            
-            switch orderedCounts {
-            case [5]:
-                return .fiveOfAKind
-                
-            case [4, 1]:
-                return .fourOfAKind
-                
-            case [3, 2]:
-                return .fullHouse
-                
-            case [3, 1, 1]:
-                return .threeOfAKind
-                
-            case [2, 2, 1]:
-                return .twoPairs
-                
-            case [2, 1, 1, 1]:
-                return .onePair
-                
-            default:
-                return .highCard
-            }
-        }
     }
     
     enum Card: Character, Comparable {
@@ -120,6 +83,139 @@ struct Day7: DayCommand {
         case twoPairs
         case onePair
         case highCard
+    }
+    
+    private struct FirstVariant: Rule {
+        func handType(for hand: Day7.Hand) -> Day7.HandType {
+            let countsByCard: [Card: Int] = hand.cards.reduce(into: [:], { result, card in
+                result[card, default: 0] += 1
+            })
+            let sortedCounts = Array(countsByCard.values).sorted(by: >)
+            
+            switch sortedCounts {
+            case [5]:
+                return .fiveOfAKind
+                
+            case [4, 1]:
+                return .fourOfAKind
+                
+            case [3, 2]:
+                return .fullHouse
+                
+            case [3, 1, 1]:
+                return .threeOfAKind
+                
+            case [2, 2, 1]:
+                return .twoPairs
+                
+            case [2, 1, 1, 1]:
+                return .onePair
+                
+            default:
+                return .highCard
+            }
+        }
+        
+        func strength(of card: Day7.Card) -> Int {
+            switch card {
+            case .labelA:
+                12
+            case .labelK:
+                11
+            case .labelQ:
+                10
+            case .labelJ:
+                9
+            case .labelT:
+                8
+            case .label9:
+                7
+            case .label8:
+                6
+            case .label7:
+                5
+            case .label6:
+                4
+            case .label5:
+                3
+            case .label4:
+                2
+            case .label3:
+                1
+            case .label2:
+                0
+            }
+        }
+    }
+    
+    private struct SecondVariant: Rule {
+        func handType(for hand: Day7.Hand) -> Day7.HandType {
+            var countsByCard: [Card: Int] = hand.cards.reduce(into: [:], { result, card in
+                result[card, default: 0] += 1
+            })
+            let jokerCount = countsByCard[.labelJ, default: 0]
+            if let highestNonJokerCountByCard = countsByCard
+                .filter({ $0.key != .labelJ })
+                .max(by: { $0.value < $1.value }), jokerCount > 0 {
+                countsByCard[highestNonJokerCountByCard.key, default: 0] += jokerCount
+                countsByCard.removeValue(forKey: .labelJ)
+            }
+            
+            let sortedCounts = Array(countsByCard.values).sorted(by: >)
+            switch sortedCounts {
+            case [5]:
+                return .fiveOfAKind
+                
+            case [4, 1]:
+                return .fourOfAKind
+                
+            case [3, 2]:
+                return .fullHouse
+                
+            case [3, 1, 1]:
+                return .threeOfAKind
+                
+            case [2, 2, 1]:
+                return .twoPairs
+                
+            case [2, 1, 1, 1]:
+                return .onePair
+                
+            default:
+                return .highCard
+            }
+        }
+        
+        func strength(of card: Day7.Card) -> Int {
+            switch card {
+            case .labelA:
+                12
+            case .labelK:
+                11
+            case .labelQ:
+                10
+            case .labelT:
+                9
+            case .label9:
+                8
+            case .label8:
+                7
+            case .label7:
+                6
+            case .label6:
+                5
+            case .label5:
+                4
+            case .label4:
+                3
+            case .label3:
+                2
+            case .label2:
+                1
+            case .labelJ:
+                0
+            }
+        }
     }
 }
 
@@ -241,5 +337,35 @@ extension Day7.HandType {
     
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.order == rhs.order
+    }
+}
+
+private protocol Rule {
+    func strength(of card: Day7.Card) -> Int
+    func handType(for hand: Day7.Hand) -> Day7.HandType
+}
+
+extension Rule {
+    func areInIncreasingOrder(_ lhs: Day7.Hand, _ rhs: Day7.Hand) -> Bool {
+        let leftHandType = handType(for: lhs)
+        let rightHandType = handType(for: rhs)
+        
+        if leftHandType < rightHandType {
+            return true
+        }
+        
+        if leftHandType > rightHandType {
+            return false
+        }
+        
+        for (leftCard, rightCard) in zip(lhs.cards, rhs.cards) {
+            if leftCard == rightCard {
+                continue
+            }
+            
+            return leftCard < rightCard
+        }
+        
+        return false
     }
 }
