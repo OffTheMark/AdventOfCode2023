@@ -59,7 +59,7 @@ struct Day7: DayCommand {
         let bid: Int
     }
     
-    enum Card: Character, Comparable {
+    enum Card: Character, CustomStringConvertible {
         case labelA = "A"
         case labelK = "K"
         case labelQ = "Q"
@@ -73,6 +73,8 @@ struct Day7: DayCommand {
         case label4 = "4"
         case label3 = "3"
         case label2 = "2"
+        
+        var description: String { String(rawValue) }
     }
     
     enum HandType: Hashable, Comparable {
@@ -86,8 +88,8 @@ struct Day7: DayCommand {
     }
     
     private struct FirstVariant: Rule {
-        func handType(for hand: Day7.Hand) -> Day7.HandType {
-            let countsByCard: [Card: Int] = hand.cards.reduce(into: [:], { result, card in
+        func handType(for cards: [Day7.Card]) -> Day7.HandType {
+            let countsByCard: [Card: Int] = cards.reduce(into: [:], { result, card in
                 result[card, default: 0] += 1
             })
             let sortedCounts = Array(countsByCard.values).sorted(by: >)
@@ -149,36 +151,33 @@ struct Day7: DayCommand {
     }
     
     private struct SecondVariant: Rule {
-        func handType(for hand: Day7.Hand) -> Day7.HandType {
-            var countsByCard: [Card: Int] = hand.cards.reduce(into: [:], { result, card in
+        func handType(for cards: [Day7.Card]) -> Day7.HandType {
+            let nonJokerCardsByCount: [Card: Int] = cards.reduce(into: [:], { result, card in
+                if card == .labelJ {
+                    return
+                }
+                
                 result[card, default: 0] += 1
             })
-            let jokerCount = countsByCard[.labelJ, default: 0]
-            if let highestNonJokerCountByCard = countsByCard
-                .filter({ $0.key != .labelJ })
-                .max(by: { $0.value < $1.value }), jokerCount > 0 {
-                countsByCard[highestNonJokerCountByCard.key, default: 0] += jokerCount
-                countsByCard.removeValue(forKey: .labelJ)
-            }
             
-            let sortedCounts = Array(countsByCard.values).sorted(by: >)
+            let sortedCounts = Array(nonJokerCardsByCount.values).sorted(by: >)
             switch sortedCounts {
-            case [5]:
+            case [5], [4], [3], [2], [1], []:
                 return .fiveOfAKind
                 
-            case [4, 1]:
+            case [4, 1], [3, 1], [2, 1], [1, 1]:
                 return .fourOfAKind
                 
-            case [3, 2]:
+            case [3, 2], [2, 2]:
                 return .fullHouse
                 
-            case [3, 1, 1]:
+            case [3, 1, 1], [1, 1, 1], [2, 2], [2, 1, 1]:
                 return .threeOfAKind
                 
             case [2, 2, 1]:
                 return .twoPairs
                 
-            case [2, 1, 1, 1]:
+            case [2, 1, 1, 1], [1, 1, 1, 1]:
                 return .onePair
                 
             default:
@@ -246,58 +245,7 @@ extension Day7.Hand {
     }
 }
 
-extension Day7.Card {
-    private var order: Int {
-        switch self {
-        case .labelA:
-            12
-        case .labelK:
-            11
-        case .labelQ:
-            10
-        case .labelJ:
-            9
-        case .labelT:
-            8
-        case .label9:
-            7
-        case .label8:
-            6
-        case .label7:
-            5
-        case .label6:
-            4
-        case .label5:
-            3
-        case .label4:
-            2
-        case .label3:
-            1
-        case .label2:
-            0
-        }
-    }
-    
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.order < rhs.order
-    }
-    
-    static func <= (lhs: Self, rhs: Self) -> Bool {
-        rhs.order <= lhs.order
-    }
-    
-    static func > (lhs: Self, rhs: Self) -> Bool {
-        lhs.order > rhs.order
-    }
-    
-    static func >= (lhs: Self, rhs: Self) -> Bool {
-        lhs.order >= rhs.order
-    }
-    
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.order == rhs.order
-    }
-}
+extension Day7.Card {}
 
 extension Day7.HandType {
     private var order: Int {
@@ -342,13 +290,13 @@ extension Day7.HandType {
 
 private protocol Rule {
     func strength(of card: Day7.Card) -> Int
-    func handType(for hand: Day7.Hand) -> Day7.HandType
+    func handType(for cards: [Day7.Card]) -> Day7.HandType
 }
 
 extension Rule {
     func areInIncreasingOrder(_ lhs: Day7.Hand, _ rhs: Day7.Hand) -> Bool {
-        let leftHandType = handType(for: lhs)
-        let rightHandType = handType(for: rhs)
+        let leftHandType = handType(for: lhs.cards)
+        let rightHandType = handType(for: rhs.cards)
         
         if leftHandType < rightHandType {
             return true
@@ -363,7 +311,7 @@ extension Rule {
                 continue
             }
             
-            return leftCard < rightCard
+            return strength(of: leftCard) < strength(of: rightCard)
         }
         
         return false
