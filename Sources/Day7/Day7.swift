@@ -171,7 +171,7 @@ struct Day7: DayCommand {
             case [3, 2], [2, 2]:
                 return .fullHouse
                 
-            case [3, 1, 1], [1, 1, 1], [2, 2], [2, 1, 1]:
+            case [3, 1, 1], [2, 1, 1], [1, 1, 1]:
                 return .threeOfAKind
                 
             case [2, 2, 1]:
