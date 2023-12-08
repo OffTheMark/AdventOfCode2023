@@ -87,22 +87,13 @@ struct Day8: DayCommand {
     
     func part2(directions: [Direction], map: [Node: Connection]) -> Int {
         let nodesStartingWithA = map.keys.filter({ $0.rawValue.hasSuffix("A") })
-        var steps = 0
-        var current = nodesStartingWithA
+        let stepsForAllNodes = nodesStartingWithA.map({ start -> Int in
+            steps(from: start, toWhere: { $0.rawValue.hasSuffix("Z") }, directions: directions, map: map)
+        })
         
-        for direction in directions.cycled() {
-            if current.allSatisfy({ $0.rawValue.hasSuffix("Z") }) {
-                break
-            }
-            
-            current = current.map({ node in
-                let connection = map[node]!
-                return connection[keyPath: direction.keyPath]
-            })
-            steps += 1
-        }
-        
-        return steps
+        return stepsForAllNodes.reduce(into: 1, { result, steps in
+            result = leastCommonMultiple(result, steps)
+        })
     }
     
     struct Node: Hashable {
@@ -162,4 +153,21 @@ extension Day8.Connection {
         self.leftNode = Node(rawValue: String(leftValue))
         self.rightNode = Node(rawValue: String(rightValue))
     }
+}
+
+func greatestCommonDivisor(_ x: Int, _ y: Int) -> Int {
+    var a = 0
+    var b = max(x, y)
+    var r = min(x, y)
+    
+    while r != 0 {
+        a = b
+        b = r
+        r = a % b
+    }
+    return b
+}
+
+func leastCommonMultiple(_ x: Int, _ y: Int) -> Int {
+    abs(x * y) / greatestCommonDivisor(x, y)
 }
