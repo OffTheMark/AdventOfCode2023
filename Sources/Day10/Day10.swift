@@ -67,18 +67,26 @@ struct Day10: DayCommand {
     ) -> [Point2D] {
         struct Node {
             let point: Point2D
+            let parent: Point2D?
             let path: [Point2D]
+            
+            init(point: Point2D, path: [Point2D]) {
+                self.point = point
+                self.path = path
+                if path.count >= 2 {
+                    self.parent = path[path.count - 2]
+                }
+                else {
+                    self.parent = nil
+                }
+            }
         }
         let startNode = Node(point: start, path: [start])
         
-        var visited = Set<Point2D>()
+        var visited: Set<Point2D> = [start]
         var stack: Deque<Node> = [startNode]
         
         outer: while let current = stack.last {
-            if current.point == end, current.path != [start] {
-                break
-            }
-            
             let neighbors = graph.neighbors(of: current.point)
             
             guard neighbors.count > 0 else {
@@ -86,16 +94,20 @@ struct Day10: DayCommand {
                 continue
             }
             
-            for neighbor in neighbors where !visited.contains(neighbor) {
-                let nextNode = Node(point: neighbor, path: current.path + [neighbor])
-                visited.insert(neighbor)
-                stack.append(nextNode)
-                continue outer
+            for neighbor in neighbors {
+                if !visited.contains(neighbor)  {
+                    let nextNode = Node(point: neighbor, path: current.path + [neighbor])
+                    visited.insert(neighbor)
+                    stack.append(nextNode)
+                    continue outer
+                }
+                else if neighbor != current.parent {
+                    break outer
+                }
             }
             
             stack.removeLast()
         }
-        
         return stack.removeLast().path
     }
     
