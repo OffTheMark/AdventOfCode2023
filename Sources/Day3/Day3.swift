@@ -189,7 +189,7 @@ struct Translation2D: Hashable {
     var deltaY: Int
 }
 
-private extension Translation2D {
+extension Translation2D {
     static let up = Self(deltaX: 0, deltaY: -1)
     static let upRight = Self(deltaX: 1, deltaY: -1)
     static let right = Self(deltaX: 1, deltaY: 0)

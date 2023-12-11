@@ -16,6 +16,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
         .package(url: "https://github.com/OffTheMark/AdventOfCodeUtilities.git", branch: "master"),
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.0.5")),
     ],
     targets: [
         .executableTarget(
@@ -23,6 +24,7 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "AdventOfCodeUtilities", package: "AdventOfCodeUtilities"),
+                .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
             ]
         ),
