@@ -87,7 +87,7 @@ struct Day10: DayCommand {
         var stack: Deque<Node> = [startNode]
         
         outer: while let current = stack.last {
-            let neighbors = graph.neighbors(of: current.point)
+            let neighbors = graph.adjacentPointsByPoint[current.point, default: []]
             
             guard neighbors.count > 0 else {
                 stack.removeLast()
@@ -150,20 +150,20 @@ struct Day10: DayCommand {
     
     struct Graph {
         let map: [Point2D: Pipe]
+        let adjacentPointsByPoint: [Point2D: Set<Point2D>]
         
-        func neighbors(of point: Point2D) -> Set<Point2D> {
-            guard let pipe = map[point] else {
-                return []
-            }
-            
-            return pipe.connections(for: point)
-                .filter({ neighbor in
+        init(map: [Point2D: Pipe]) {
+            self.map = map
+            self.adjacentPointsByPoint = map.reduce(into: [:], { result, pair in
+                let (point, pipe) = pair
+                result[point] = pipe.connections(for: point).filter({ neighbor in
                     guard let neighboringPipe = map[neighbor] else {
                         return false
                     }
                     
                     return neighboringPipe.connections(for: neighbor).contains(point)
                 })
+            })
         }
     }
 }
