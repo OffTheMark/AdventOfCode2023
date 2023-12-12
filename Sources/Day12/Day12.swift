@@ -31,64 +31,122 @@ struct Day12: DayCommand {
     
     func part1(records: [Record]) -> Int {
         records.reduce(into: 0, { sum, record in
-            let numberOfMatchingArrangements = record.arrangementsMatchingCriteria()
-            sum += numberOfMatchingArrangements
+            let matchingArrangements = matchingArrangements(for: record)
+            sum += matchingArrangements
         })
     }
     
-    
-    struct Record {
-        typealias SpringState = Day12.SpringState
+    func matchingArrangements(for record: Record) -> Int {
+        var matchingArrangementsByRecord = [Record: Int]()
         
-        let rawValue: String
-        let count: Int
-        let knownSpringStatesByIndex: [Int: SpringState]
-        let contiguousGroupSizes: [Int]
-        let unknownIndices: [Int]
-        
-        func arrangementsMatchingCriteria() -> Int {
-            if unknownIndices.isEmpty {
+        func recursiveMatchingArrangements(for record: Record) -> Int {
+            if let result = matchingArrangementsByRecord[record] {
+                return result
+            }
+            
+            if record.springs.isEmpty {
+                return if record.contiguousGroupSizes.isEmpty {
+                    1
+                }
+                else {
+                    0
+                }
+            }
+            
+            let operationalOrUnknown: Set<Character> = [".", "?"]
+            if record.contiguousGroupSizes.isEmpty, record.springs.allSatisfy({ operationalOrUnknown.contains($0)}) {
                 return 1
             }
             
-            let totalNumberOfBrokenSprings = contiguousGroupSizes.reduce(0, +)
-            let numberOfKnownBrokenSprings = knownSpringStatesByIndex.count(where: { $0.value == .damaged })
-            let numberOfUnknownBrokenSprings = totalNumberOfBrokenSprings - numberOfKnownBrokenSprings
+            let brokenOrUnknown: Set<Character> = ["#", "?"]
+            let countOfBrokenOrUnknown = record.springs.count(where: { brokenOrUnknown.contains($0) })
+            let countOfBrokenSprings = record.contiguousGroupSizes.reduce(0, +)
             
-            if numberOfUnknownBrokenSprings == unknownIndices.count {
-                return 1
+            if countOfBrokenOrUnknown < countOfBrokenSprings {
+                return 0
             }
             
-            let possibleSpringStates: [SpringState] = Array(repeating: .damaged, count: numberOfUnknownBrokenSprings) +
-                Array(repeating: .operational, count: unknownIndices.count - numberOfUnknownBrokenSprings)
-            let permutations = possibleSpringStates.uniquePermutations()
+            if countOfBrokenOrUnknown == countOfBrokenSprings, 
+                record.springs.count < countOfBrokenOrUnknown + max(0, record.contiguousGroupSizes.count - 1) {
+                return 0
+            }
             
-            return permutations.count(where: { permutation in
-                var iterator = permutation.makeIterator()
+            if record.springs.starts(with: ".") {
+                let shortened = Record(
+                    springs: String(record.springs.dropFirst()),
+                    contiguousGroupSizes: record.contiguousGroupSizes
+                )
+                let result = recursiveMatchingArrangements(for: shortened)
+                matchingArrangementsByRecord[record] = result
                 
-                let springState = (0 ..< count).map({ index in
-                    if let state = knownSpringStatesByIndex[index] {
-                        return state
-                    }
-                    
-                    return iterator.next()!
-                })
+                return result
+            }
+            
+            if record.springs.starts(with: "#") {
+                guard let firstGroupSize = record.contiguousGroupSizes.first else {
+                    return 0
+                }
                 
-                return matchesCriteria(springState)
+                guard record.springs.count >= firstGroupSize else {
+                    return 0
+                }
+                
+                if record.springs.prefix(firstGroupSize).contains(".") {
+                    return 0
+                }
+                
+                var shortened = Record(
+                    springs: String(record.springs.dropFirst(firstGroupSize)),
+                    contiguousGroupSizes: Array(record.contiguousGroupSizes.dropFirst())
+                )
+                
+                if shortened.springs.starts(with: "#") {
+                    return 0
+                }
+                
+                if shortened.springs.starts(with: "?") {
+                    shortened.springs = "." + Array(shortened.springs.dropFirst())
+                }
+                
+                let result = recursiveMatchingArrangements(for: shortened)
+                matchingArrangementsByRecord[record] = result
+                return result
+            }
+            
+            guard record.springs.starts(with: "?") else {
+                return 0
+            }
+            
+            let possibleRecords = [
+                Record(
+                    springs: "." + String(record.springs.dropFirst()),
+                    contiguousGroupSizes: record.contiguousGroupSizes
+                ),
+                Record(
+                    springs: "#" + String(record.springs.dropFirst()),
+                    contiguousGroupSizes: record.contiguousGroupSizes
+                ),
+            ]
+            
+            let result = possibleRecords.reduce(into: 0, { sum, record in
+                sum += recursiveMatchingArrangements(for: record)
             })
+            matchingArrangementsByRecord[record] = result
+            return result
         }
         
-        private func matchesCriteria(_ springStates: [SpringState]) -> Bool {
-            let chunked = springStates.chunked(by: { $0 == $1 })
-            let groupsOfBrokenSprings = chunked.filter({ $0.contains(.damaged) })
+        return recursiveMatchingArrangements(for: record)
+    }
+    
+    struct Record: Hashable {
+        var springs: String
+        let contiguousGroupSizes: [Int]
+        
+        func unfolded() -> Self {
+            let springs = Array(repeating: springs, count: 5).joined(separator: "?")
+            let contiguousGroupSizes = Array(Array(repeating: contiguousGroupSizes, count: 5).joined())
             
-            if groupsOfBrokenSprings.count != contiguousGroupSizes.count {
-                return false
-            }
-            
-            return zip(groupsOfBrokenSprings, contiguousGroupSizes).allSatisfy({ group, size in
-                group.count == size
-            })
+            return Self(springs: springs, contiguousGroupSizes: contiguousGroupSizes)
         }
     }
     
@@ -106,23 +164,7 @@ extension Day12.Record {
             return nil
         }
         
-        var unknownIndices = [Int]()
-        let knownSpringStatesByIndex: [Int: SpringState] = components[0].enumerated()
-            .reduce(into: [:], { result, pair in
-                let (index, character) = pair
-                
-                guard let state = SpringState(rawValue: character) else {
-                    unknownIndices.append(index)
-                    return
-                }
-                result[index] = state
-            })
-        let contiguousGroupSizes = components[1].components(separatedBy: ",").compactMap(Int.init)
-        
-        self.rawValue = rawValue
-        self.count = components[0].count
-        self.knownSpringStatesByIndex = knownSpringStatesByIndex
-        self.contiguousGroupSizes = contiguousGroupSizes
-        self.unknownIndices = unknownIndices
+        self.springs = components[0]
+        self.contiguousGroupSizes = components[1].components(separatedBy: ",").compactMap(Int.init)
     }
 }
