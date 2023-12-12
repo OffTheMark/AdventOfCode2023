@@ -31,7 +31,8 @@ struct Day12: DayCommand {
     
     func part1(records: [Record]) -> Int {
         records.reduce(into: 0, { sum, record in
-            sum += record.arrangementsMatchingCriteria()
+            let numberOfMatchingArrangements = record.arrangementsMatchingCriteria()
+            sum += numberOfMatchingArrangements
         })
     }
     
@@ -58,17 +59,36 @@ struct Day12: DayCommand {
                 return 1
             }
             
-            let permutations = unknownIndices.permutations()
+            let possibleSpringStates: [SpringState] = Array(repeating: .damaged, count: numberOfUnknownBrokenSprings) +
+                Array(repeating: .operational, count: unknownIndices.count - numberOfUnknownBrokenSprings)
+            let permutations = possibleSpringStates.uniquePermutations()
             
             return permutations.count(where: { permutation in
-                // TODO
-                false
+                var iterator = permutation.makeIterator()
+                
+                let springState = (0 ..< count).map({ index in
+                    if let state = knownSpringStatesByIndex[index] {
+                        return state
+                    }
+                    
+                    return iterator.next()!
+                })
+                
+                return matchesCriteria(springState)
             })
         }
         
-        private func matchesCriteria(_ springStatesByIndex: [Int: SpringState]) -> Bool {
-            // TODO
-            false
+        private func matchesCriteria(_ springStates: [SpringState]) -> Bool {
+            let chunked = springStates.chunked(by: { $0 == $1 })
+            let groupsOfBrokenSprings = chunked.filter({ $0.contains(.damaged) })
+            
+            if groupsOfBrokenSprings.count != contiguousGroupSizes.count {
+                return false
+            }
+            
+            return zip(groupsOfBrokenSprings, contiguousGroupSizes).allSatisfy({ group, size in
+                group.count == size
+            })
         }
     }
     
