@@ -22,10 +22,7 @@ struct Day13: DayCommand {
     var puzzleInputPath: String
     
     func run() throws {
-        let grids = try readFile().components(separatedBy: "\n\n").map({ block in
-            let rows = block.components(separatedBy: .newlines)
-            return Grid(rows: rows)
-        })
+        let grids = try readFile().components(separatedBy: "\n\n").map(Grid.init)
         
         printTitle("Part 1", level: .title1)
         let sumOfNotes = part1(grids: grids)
@@ -45,57 +42,81 @@ struct Day13: DayCommand {
     }
     
     struct Grid {
-        let rows: [String]
-        let columns: [String]
+        typealias State = Day13.State
         
-        init(rows: [String]) {
-            var columns = [String]()
-            
-            for row in rows {
-                for (x, character) in row.enumerated() {
-                    if !columns.indices.contains(x) {
-                        columns.append("")
-                    }
-                    
-                    columns[x].append(character)
-                }
-            }
-            
-            self.rows = rows
-            self.columns = columns
-        }
+        let statesByPoint: [Point2D: State]
+        let width: Int
+        let height: Int
+        
+        var columns: Range<Int> { 0 ..< width }
+        var rows: Range<Int> { 0 ..< height }
         
         func horizontalReflectionLine() -> Int? {
-            let numberOfColumns = columns.count
-            return columns.indices.dropLast().first(where: { index in
-                let distances = 0 ... min(index, numberOfColumns - index - 2)
+            columns.dropLast().first(where: { column in
+                let distances = 0 ... min(column, width - column - 2)
                 
                 return distances.allSatisfy({ distance in
-                    let leftColumnIndex = index - distance
-                    let rightColumnIndex = index + distance + 1
-                    let leftColumn = columns[leftColumnIndex]
-                    let rightColumn = columns[rightColumnIndex]
+                    let leftColumn = column - distance
+                    let rightColumn = column + distance + 1
                     
-                    return leftColumn == rightColumn
+                    return rows.allSatisfy({ row in
+                        let leftPoint = Point2D(x: leftColumn, y: row)
+                        let rightPoint = Point2D(x: rightColumn, y: row)
+                        
+                        return statesByPoint[leftPoint] == statesByPoint[rightPoint]
+                    })
                 })
             })
         }
         
         func verticalReflectionLine() -> Int? {
-            let numberOfRows = rows.count
-            return rows.indices.dropLast().first(where: { index in
-                let distances = 0 ... min(index, numberOfRows - index - 2)
+            rows.dropLast().first(where: { row in
+                let distances = 0 ... min(row, height - row - 2)
                 
                 return distances.allSatisfy({ distance in
-                    let topRowIndex = index - distance
-                    let bottomRowIndex = index + distance + 1
-                    let topRow = rows[topRowIndex]
-                    let bottomRow = rows[bottomRowIndex]
+                    let topRow = row - distance
+                    let bottomRow = row + distance + 1
                     
-                    return topRow == bottomRow
+                    return columns.allSatisfy({ column in
+                        let topPoint = Point2D(x: column, y: topRow)
+                        let bottomPoint = Point2D(x: column, y: bottomRow)
+                        
+                        return statesByPoint[topPoint] == statesByPoint[bottomPoint]
+                    })
                 })
             })
         }
     }
+    
+    enum State: Character {
+        case ash = "."
+        case rock = "#"
+    }
 }
 
+extension Day13.Grid {
+    init(rawValue: String) {
+        let rows = rawValue.components(separatedBy: .newlines)
+        let height = rows.count
+        var width = 0
+        var statesByPoint = [Point2D: State]()
+        
+        for (y, row) in rows.enumerated() {
+            width = max(width, row.count)
+            
+            for (x, character) in row.enumerated() {
+                
+                guard let state = State(rawValue: character) else {
+                    continue
+                }
+                
+                let point = Point2D(x: x, y: y)
+                statesByPoint[point] = state
+            }
+        }
+        
+        self.statesByPoint = statesByPoint
+        self.width = width
+        self.height = height
+    }
+}
