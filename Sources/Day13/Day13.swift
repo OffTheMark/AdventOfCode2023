@@ -38,10 +38,10 @@ struct Day13: DayCommand {
             if let firstReflectionLine = grid.firstReflectionLine() {
                 switch firstReflectionLine {
                 case .horizontal(let column):
-                    sum += column + 1
+                    sum += column
                     
                 case .vertical(let row):
-                    sum += (row + 1) * 100
+                    sum += row * 100
                 }
             }
         })
@@ -52,30 +52,26 @@ struct Day13: DayCommand {
             let firstReflectionLine = grid.firstReflectionLine()!
             
             var reflectionLine: ReflectionLine?
-            let smudgeCorrected = product(grid.columns, grid.rows).lazy.map(Point2D.init).first(where: { point in
+            for point in product(grid.columns, grid.rows).lazy.map(Point2D.init) {
                 let corrected = grid.togglingState(at: point)
-                
                 let reflectionLinesExceptExistingOne = corrected.reflectionLines().subtracting([firstReflectionLine])
                 
                 if reflectionLinesExceptExistingOne.count == 1 {
                     reflectionLine = reflectionLinesExceptExistingOne.first
-                    return true
+                    break
                 }
-                else {
-                    return false
-                }
-            })
+            }
             
-            guard let smudgeCorrected, let reflectionLine else {
+            guard let reflectionLine else {
                 return
             }
             
             switch reflectionLine {
             case .horizontal(let column):
-                sum += column + 1
+                sum += column
                 
             case .vertical(let row):
-                sum += (row + 1) * 100
+                sum += row * 100
             }
         })
     }
@@ -106,11 +102,11 @@ struct Day13: DayCommand {
         }
         
         func firstVerticalReflectionLine() -> Int? {
-            rows.dropLast().first(where: isRowReflectionLine)
+            rows.dropFirst().first(where: isRowReflectionLine)
         }
         
         func firstHorizontalReflectionLine() -> Int? {
-            columns.dropLast().first(where: isColumnReflectionLine)
+            columns.dropFirst().first(where: isColumnReflectionLine)
         }
         
         func reflectionLines() -> Set<ReflectionLine> {
@@ -124,19 +120,19 @@ struct Day13: DayCommand {
         }
         
         func verticalReflectionLines() -> [Int] {
-            rows.dropLast().filter(isRowReflectionLine)
+            rows.dropFirst().filter(isRowReflectionLine)
         }
         
         func horizontalReflectionLines() -> [Int] {
-            columns.dropLast().filter(isColumnReflectionLine)
+            columns.dropFirst().filter(isColumnReflectionLine)
         }
         
         private func isColumnReflectionLine(_ column: Int) -> Bool {
-            let distances = 0 ... min(column, width - column - 2)
+            let distances = 0 ... min(column - 1, width - column - 1)
             
             return distances.allSatisfy({ distance in
-                let leftColumn = column - distance
-                let rightColumn = column + distance + 1
+                let leftColumn = column - distance - 1
+                let rightColumn = column + distance
                 
                 return rows.allSatisfy({ row in
                     let leftPoint = Point2D(x: leftColumn, y: row)
@@ -148,11 +144,11 @@ struct Day13: DayCommand {
         }
         
         private func isRowReflectionLine(_ row: Int) -> Bool {
-            let distances = 0 ... min(row, height - row - 2)
+            let distances = 0 ... min(row - 1, height - row - 1)
             
             return distances.allSatisfy({ distance in
-                let topRow = row - distance
-                let bottomRow = row + distance + 1
+                let topRow = row - distance - 1
+                let bottomRow = row + distance
                 
                 return columns.allSatisfy({ column in
                     let topPoint = Point2D(x: column, y: topRow)
