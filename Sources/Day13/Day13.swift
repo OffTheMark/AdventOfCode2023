@@ -27,16 +27,55 @@ struct Day13: DayCommand {
         printTitle("Part 1", level: .title1)
         let sumOfNotes = part1(grids: grids)
         print("Sum of all notes:", sumOfNotes, terminator: "\n\n")
+        
+        printTitle("Part 2", level: .title1)
+        let sumOfNotesAfterCorrectingSmudges = part2(grids: grids)
+        print("Summ of all notes after correcting smudges:", sumOfNotesAfterCorrectingSmudges)
     }
     
     func part1(grids: [Grid]) -> Int {
         grids.reduce(into: 0, { sum, grid in
-            if let horizontalReflectionLine = grid.horizontalReflectionLine() {
-                sum += horizontalReflectionLine + 1
+            if let firstReflectionLine = grid.firstReflectionLine() {
+                switch firstReflectionLine {
+                case .horizontal(let column):
+                    sum += column + 1
+                    
+                case .vertical(let row):
+                    sum += (row + 1) * 100
+                }
+            }
+        })
+    }
+    
+    func part2(grids: [Grid]) -> Int {
+        grids.reduce(into: 0, { sum, grid in
+            let firstReflectionLine = grid.firstReflectionLine()!
+            
+            var reflectionLine: ReflectionLine?
+            let smudgeCorrected = product(grid.columns, grid.rows).lazy.map(Point2D.init).first(where: { point in
+                let corrected = grid.togglingState(at: point)
+                
+                let reflectionLinesExceptExistingOne = corrected.reflectionLines().subtracting([firstReflectionLine])
+                
+                if reflectionLinesExceptExistingOne.count == 1 {
+                    reflectionLine = reflectionLinesExceptExistingOne.first
+                    return true
+                }
+                else {
+                    return false
+                }
+            })
+            
+            guard let smudgeCorrected, let reflectionLine else {
+                return
             }
             
-            if let verticalReflectionLine = grid.verticalReflectionLine() {
-                sum += 100 * (verticalReflectionLine + 1)
+            switch reflectionLine {
+            case .horizontal(let column):
+                sum += column + 1
+                
+            case .vertical(let row):
+                sum += (row + 1) * 100
             }
         })
     }
@@ -51,38 +90,75 @@ struct Day13: DayCommand {
         var columns: Range<Int> { 0 ..< width }
         var rows: Range<Int> { 0 ..< height }
         
-        func horizontalReflectionLine() -> Int? {
-            columns.dropLast().first(where: { column in
-                let distances = 0 ... min(column, width - column - 2)
+        func togglingState(at point: Point2D) -> Self {
+            var statesByPoint = statesByPoint
+            statesByPoint[point]?.toggle()
+            
+            return Self(statesByPoint: statesByPoint, width: width, height: height)
+        }
+        
+        func firstReflectionLine() -> ReflectionLine? {
+            if let verticalLine = firstVerticalReflectionLine() {
+                return .vertical(verticalLine)
+            }
+            
+            return firstHorizontalReflectionLine().map({ .horizontal($0) })
+        }
+        
+        func firstVerticalReflectionLine() -> Int? {
+            rows.dropLast().first(where: isRowReflectionLine)
+        }
+        
+        func firstHorizontalReflectionLine() -> Int? {
+            columns.dropLast().first(where: isColumnReflectionLine)
+        }
+        
+        func reflectionLines() -> Set<ReflectionLine> {
+            let verticalReflectionLines = verticalReflectionLines()
+            let horizontalReflectionLines = horizontalReflectionLines()
+            
+            return Set(
+                verticalReflectionLines.map({ .vertical($0) }) + 
+                horizontalReflectionLines.map({ .horizontal($0) })
+            )
+        }
+        
+        func verticalReflectionLines() -> [Int] {
+            rows.dropLast().filter(isRowReflectionLine)
+        }
+        
+        func horizontalReflectionLines() -> [Int] {
+            columns.dropLast().filter(isColumnReflectionLine)
+        }
+        
+        private func isColumnReflectionLine(_ column: Int) -> Bool {
+            let distances = 0 ... min(column, width - column - 2)
+            
+            return distances.allSatisfy({ distance in
+                let leftColumn = column - distance
+                let rightColumn = column + distance + 1
                 
-                return distances.allSatisfy({ distance in
-                    let leftColumn = column - distance
-                    let rightColumn = column + distance + 1
+                return rows.allSatisfy({ row in
+                    let leftPoint = Point2D(x: leftColumn, y: row)
+                    let rightPoint = Point2D(x: rightColumn, y: row)
                     
-                    return rows.allSatisfy({ row in
-                        let leftPoint = Point2D(x: leftColumn, y: row)
-                        let rightPoint = Point2D(x: rightColumn, y: row)
-                        
-                        return statesByPoint[leftPoint] == statesByPoint[rightPoint]
-                    })
+                    return statesByPoint[leftPoint] == statesByPoint[rightPoint]
                 })
             })
         }
         
-        func verticalReflectionLine() -> Int? {
-            rows.dropLast().first(where: { row in
-                let distances = 0 ... min(row, height - row - 2)
+        private func isRowReflectionLine(_ row: Int) -> Bool {
+            let distances = 0 ... min(row, height - row - 2)
+            
+            return distances.allSatisfy({ distance in
+                let topRow = row - distance
+                let bottomRow = row + distance + 1
                 
-                return distances.allSatisfy({ distance in
-                    let topRow = row - distance
-                    let bottomRow = row + distance + 1
+                return columns.allSatisfy({ column in
+                    let topPoint = Point2D(x: column, y: topRow)
+                    let bottomPoint = Point2D(x: column, y: bottomRow)
                     
-                    return columns.allSatisfy({ column in
-                        let topPoint = Point2D(x: column, y: topRow)
-                        let bottomPoint = Point2D(x: column, y: bottomRow)
-                        
-                        return statesByPoint[topPoint] == statesByPoint[bottomPoint]
-                    })
+                    return statesByPoint[topPoint] == statesByPoint[bottomPoint]
                 })
             })
         }
@@ -91,6 +167,21 @@ struct Day13: DayCommand {
     enum State: Character {
         case ash = "."
         case rock = "#"
+        
+        mutating func toggle() {
+            switch self {
+            case .ash:
+                self = .rock
+                
+            case .rock:
+                self = .ash
+            }
+        }
+    }
+    
+    enum ReflectionLine: Hashable {
+        case horizontal(Int)
+        case vertical(Int)
     }
 }
 
