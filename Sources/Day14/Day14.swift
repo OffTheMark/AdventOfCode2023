@@ -27,23 +27,58 @@ struct Day14: DayCommand {
         printTitle("Part 1", level: .title1)
         let totalLoadOnNorthSupportBeams = part1(grid: grid)
         print("Total load on the north support beams:", totalLoadOnNorthSupportBeams, terminator: "\n\n")
+        
+        printTitle("Part 2", level: .title1)
+        let totalLoadAfterSpinCycles = part2(grid: grid)
+        print("Total load on the north support beams after 1,000,000,000 spin cycles:", totalLoadAfterSpinCycles)
     }
     
     func part1(grid: Grid) -> Int {
         let tilted = grid.tiltedNorth()
         
-        return tilted.rocksByPoint.reduce(into: 0, { sum, element in
-            let (point, rock) = element
-            
-            guard rock == .rounded else {
-                return
-            }
-            
-            sum += tilted.size.height - point.y
-        })
+        return tilted.loadOnNorthSupportBeams()
     }
     
-    struct Grid {
+    func part2(grid: Grid) -> Int {
+        let spinCycles = 1_000_000_000
+        
+        struct Snapshot: Hashable {
+            let grid: Grid
+            let load: Int
+        }
+        
+        var grid = grid
+        var spinCyclesBySnapshot = [Snapshot: Int]()
+        
+        var currentCycle = 0
+        var hasJumped = false
+        while currentCycle < spinCycles {
+            grid = grid.tiltedNorth()
+            grid = grid.tiltedWest()
+            grid = grid.tiltedSouth()
+            grid = grid.tiltedEast()
+            
+            let load = grid.loadOnNorthSupportBeams()
+            let snapshot = Snapshot(grid: grid, load: load)
+            
+            if !hasJumped, let previousSpinCycle = spinCyclesBySnapshot[snapshot] {
+                let cycleSize = currentCycle - previousSpinCycle
+                
+                let numberOfPossibleJumps = (spinCycles - currentCycle) / cycleSize
+                let jump = numberOfPossibleJumps * cycleSize + 1
+                currentCycle += jump
+                hasJumped = true
+            }
+            else {
+                spinCyclesBySnapshot[snapshot] = currentCycle
+                currentCycle += 1
+            }
+        }
+        
+        return grid.loadOnNorthSupportBeams()
+    }
+    
+    struct Grid: Hashable {
         typealias Rock = Day14.Rock
         
         let rocksByPoint: [Point2D: Rock]
@@ -58,33 +93,160 @@ struct Day14: DayCommand {
         let minY: Int = 0
         var maxY: Int { size.height - 1 }
         
+        var description: String {
+            rows.map({ y -> String in
+                String(columns.map({ x -> Character in
+                    let point = Point2D(x: x, y: y)
+                    
+                    return rocksByPoint[point]?.rawValue ?? "."
+                }))
+            }).joined(separator: "\n")
+        }
+        
+        func loadOnNorthSupportBeams() -> Int {
+            rocksByPoint.reduce(into: 0, { sum, element in
+                let (point, rock) = element
+                
+                guard rock == .rounded else {
+                    return
+                }
+                
+                sum += size.height - point.y
+            })
+        }
+        
         func tiltedNorth() -> Self {
             var rocksByPoint = rocksByPoint
             
             for column in columns {
                 let rocksInColumn = rocksByPoint.filter({ $0.key.x == column }).sorted(by: { $0.key.y < $1.key.y })
-                var lastPlacedRock: (point: Point2D, rock: Rock)?
+                var lastPlacedPoint: Point2D?
                 
                 for (point, rock) in rocksInColumn {
                     switch rock {
                     case .square:
-                        lastPlacedRock = (point, rock)
+                        lastPlacedPoint = point
                         
                     case .rounded:
-                        let newPoint = if let lastPlacedRock {
-                            Point2D(x: lastPlacedRock.point.x, y: lastPlacedRock.point.y + 1)
+                        let newPoint = if let lastPlacedPoint {
+                            Point2D(x: lastPlacedPoint.x, y: lastPlacedPoint.y + 1)
                         }
                         else {
-                            Point2D(x: column, y: 0)
+                            Point2D(x: column, y: minY)
                         }
                         
                         if newPoint.y < point.y {
                             rocksByPoint.removeValue(forKey: point)
                             rocksByPoint[newPoint] = rock
-                            lastPlacedRock = (newPoint, rock)
+                            lastPlacedPoint = newPoint
                         }
                         else {
-                            lastPlacedRock = (point, rock)
+                            lastPlacedPoint = point
+                        }
+                    }
+                }
+            }
+            
+            return Self(rocksByPoint: rocksByPoint, size: size)
+        }
+        
+        func tiltedSouth() -> Self {
+            var rocksByPoint = rocksByPoint
+            
+            for column in columns {
+                let rocksInColumn = rocksByPoint.filter({ $0.key.x == column }).sorted(by: { $0.key.y > $1.key.y })
+                var lastPlacedPoint: Point2D?
+                
+                for (point, rock) in rocksInColumn {
+                    switch rock {
+                    case .square:
+                        lastPlacedPoint = point
+                        
+                    case .rounded:
+                        let newPoint = if let lastPlacedPoint {
+                            Point2D(x: lastPlacedPoint.x, y: lastPlacedPoint.y - 1)
+                        }
+                        else {
+                            Point2D(x: column, y: maxY)
+                        }
+                        
+                        if newPoint.y > point.y {
+                            rocksByPoint.removeValue(forKey: point)
+                            rocksByPoint[newPoint] = rock
+                            lastPlacedPoint = newPoint
+                        }
+                        else {
+                            lastPlacedPoint = point
+                        }
+                    }
+                }
+            }
+            
+            return Self(rocksByPoint: rocksByPoint, size: size)
+        }
+        
+        func tiltedWest() -> Self {
+            var rocksByPoint = rocksByPoint
+            
+            for row in rows {
+                let rocksInRow = rocksByPoint.filter({ $0.key.y == row }).sorted(by: { $0.key.x < $1.key.x })
+                var lastPlacedPoint: Point2D?
+                
+                for (point, rock) in rocksInRow {
+                    switch rock {
+                    case .square:
+                        lastPlacedPoint = point
+                        
+                    case .rounded:
+                        let newPoint = if let lastPlacedPoint {
+                            Point2D(x: lastPlacedPoint.x + 1, y: lastPlacedPoint.y)
+                        }
+                        else {
+                            Point2D(x: minX, y: row)
+                        }
+                        
+                        if newPoint.x < point.x {
+                            rocksByPoint.removeValue(forKey: point)
+                            rocksByPoint[newPoint] = rock
+                            lastPlacedPoint = newPoint
+                        }
+                        else {
+                            lastPlacedPoint = point
+                        }
+                    }
+                }
+            }
+            
+            return Self(rocksByPoint: rocksByPoint, size: size)
+        }
+        
+        func tiltedEast() -> Self {
+            var rocksByPoint = rocksByPoint
+            
+            for row in rows {
+                let rocksInRow = rocksByPoint.filter({ $0.key.y == row }).sorted(by: { $0.key.x > $1.key.x })
+                var lastPlacedPoint: Point2D?
+                
+                for (point, rock) in rocksInRow {
+                    switch rock {
+                    case .square:
+                        lastPlacedPoint = point
+                        
+                    case .rounded:
+                        let newPoint = if let lastPlacedPoint {
+                            Point2D(x: lastPlacedPoint.x - 1, y: lastPlacedPoint.y)
+                        }
+                        else {
+                            Point2D(x: maxX, y: row)
+                        }
+                        
+                        if newPoint.x > point.x {
+                            rocksByPoint.removeValue(forKey: point)
+                            rocksByPoint[newPoint] = rock
+                            lastPlacedPoint = newPoint
+                        }
+                        else {
+                            lastPlacedPoint = point
                         }
                     }
                 }
@@ -94,7 +256,7 @@ struct Day14: DayCommand {
         }
     }
     
-    enum Rock: Character {
+    enum Rock: Character, Hashable {
         case rounded = "O"
         case square = "#"
     }

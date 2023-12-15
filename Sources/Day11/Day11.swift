@@ -134,7 +134,7 @@ struct Day11: DayCommand {
     }
 }
 
-struct Size2D: Equatable {
+struct Size2D: Hashable {
     var width: Int
     var height: Int
 }
