@@ -42,26 +42,18 @@ struct Day14: DayCommand {
     func part2(grid: Grid) -> Int {
         let spinCycles = 1_000_000_000
         
-        struct Snapshot: Hashable {
-            let grid: Grid
-            let load: Int
-        }
-        
         var grid = grid
-        var spinCyclesBySnapshot = [Snapshot: Int]()
-        
+        var spinCyclesByGrid = [Grid: Int]()
         var currentCycle = 0
         var hasJumped = false
+        
         while currentCycle < spinCycles {
             grid = grid.tiltedNorth()
             grid = grid.tiltedWest()
             grid = grid.tiltedSouth()
             grid = grid.tiltedEast()
             
-            let load = grid.loadOnNorthSupportBeams()
-            let snapshot = Snapshot(grid: grid, load: load)
-            
-            if !hasJumped, let previousSpinCycle = spinCyclesBySnapshot[snapshot] {
+            if !hasJumped, let previousSpinCycle = spinCyclesByGrid[grid] {
                 let cycleSize = currentCycle - previousSpinCycle
                 
                 let numberOfPossibleJumps = (spinCycles - currentCycle) / cycleSize
@@ -70,7 +62,7 @@ struct Day14: DayCommand {
                 hasJumped = true
             }
             else {
-                spinCyclesBySnapshot[snapshot] = currentCycle
+                spinCyclesByGrid[grid] = currentCycle
                 currentCycle += 1
             }
         }
