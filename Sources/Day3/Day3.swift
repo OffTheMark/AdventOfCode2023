@@ -182,6 +182,8 @@ struct Point2D: Hashable {
         copy.apply(translation)
         return copy
     }
+    
+    static let zero = Self(x: 0, y: 0)
 }
 
 struct Translation2D: Hashable {
