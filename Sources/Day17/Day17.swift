@@ -88,6 +88,8 @@ struct Day17: DayCommand {
         in grid: Grid<Int>,
         availableDirectionsForState: @escaping (State) -> [Direction]
     ) -> Int {
+        // Based on rickzwankce's solution for day 17, using Dijsktra's algorithm
+        // https://github.com/rizwankce/AdventOfCode/blob/master/2023/Sources/Day17.swift
         struct Node: Comparable {
             let state: State
             let cost: Int
