@@ -65,6 +65,10 @@ struct Point2D: Hashable {
     var x: Int
     var y: Int
     
+    func manhattanDistance(to position: Point2D) -> Int {
+        abs(x - position.x) + abs(y - position.y)
+    }
+    
     func adjacentPoints(includingDiagonals includesDiagonals: Bool) -> Set<Point2D> {
         var translations: [Translation2D] = [
             .up,

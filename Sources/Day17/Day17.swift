@@ -41,79 +41,89 @@ struct Day17: DayCommand {
         to end: Point2D,
         in grid: Grid<Int>
     ) -> Int {
-        struct Node {
-            let position: Point2D
-            let path: [Point2D]
-            let moves: Deque<Direction>
-            let visited: Set<Point2D>
+        struct Node: Comparable {
+            let state: State
             let cost: Int
+            let priority: Int
             
-            func availableMoves() -> [Direction] {
-                let lastThreeMoves = moves.suffix(3)
-                
-                guard let lastMove = lastThreeMoves.last else {
-                    return Direction.allCases
+            var position: Point2D { state.position }
+            var direction: Direction { state.direction }
+            var distanceWithoutTurning: Int { state.distanceWithoutTurning }
+            
+            func availableDirections() -> [Direction] {
+                var availableMoves: [Direction] = [direction.rotatedLeft()]
+                if state.distanceWithoutTurning < 3 {
+                    availableMoves.append(direction)
                 }
-                
-                var availableMoves = lastMove.availableDirections()
-                let hasDoneSameMoveThrice = Set(lastThreeMoves).count == 1
-                if hasDoneSameMoveThrice {
-                    availableMoves.removeAll(where: { $0 == lastMove })
-                }
+                availableMoves.append(direction.rotatedRight())
                 return availableMoves
             }
-        }
-        
-        let firstNode = Node(
-            position: start,
-            path: [start],
-            moves: [],
-            visited: [],
-            cost: 0
-        )
-        var costByPosition = [Point2D: Int]()
-        
-        var frontier: Deque<Node> = [firstNode] {
-            didSet {
-                frontier.sort(by: { $0.cost < $1.cost })
+            
+            static func < (lhs: Self, rhs: Self) -> Bool {
+                lhs.priority < rhs.priority
             }
         }
         
-        while let current = frontier.popFirst() {
+        struct State: Hashable {
+            let position: Point2D
+            let direction: Direction
+            let distanceWithoutTurning: Int
+        }
+        
+        let firstStates = [
+            State(position: start, direction: .right, distanceWithoutTurning: 1),
+            State(position: start, direction: .down, distanceWithoutTurning: 1)
+        ]
+        var costByState = [State: Int]()
+        var visited = Set<State>()
+        
+        var frontier = Heap<Node>()
+        for state in firstStates {
+            let node = Node(state: state, cost: 0, priority: 1)
+            frontier.insert(node)
+        }
+        
+    outer: while let current = frontier.popMin() {
             if current.position == end {
                 return current.cost
             }
             
-            if !current.moves.isEmpty {
-                costByPosition[current.position] = current.cost
+            let (newlyVisited, _) = visited.insert(current.state)
+            if !newlyVisited {
+                continue outer
             }
             
-            let availableMoves = current.availableMoves()
-            
-            for move in availableMoves {
-                let neighbor = current.position.applying(move.translation)
+            let availableDirections = current.availableDirections()
+            inner: for direction in availableDirections {
+                let neighbor = current.position.applying(direction.translation)
                 
                 guard let cost = grid.valuesByPosition[neighbor] else {
-                    continue
+                    continue inner
                 }
                 
-                if current.visited.contains(neighbor) {
-                    continue
+                let distanceWithoutTurning = if direction == current.direction {
+                    current.distanceWithoutTurning + 1
                 }
-                
-                let node = Node(
+                else {
+                    1
+                }
+                let state = State(
                     position: neighbor,
-                    path: current.path + [neighbor],
-                    moves: current.moves + [move],
-                    visited: current.visited.union([neighbor]),
-                    cost: current.cost + cost
+                    direction: direction,
+                    distanceWithoutTurning: distanceWithoutTurning
+                )
+                let node = Node(
+                    state: state,
+                    cost: current.cost + cost,
+                    priority: current.cost + current.position.manhattanDistance(to: neighbor)
                 )
                 
-                if let previousCost = costByPosition[neighbor], previousCost < node.cost {
-                    continue
+                if let previousCost = costByState[state], previousCost < node.cost {
+                    continue inner
                 }
                 
-                frontier.append(node)
+                costByState[state] = node.cost
+                frontier.insert(node)
             }
         }
         
@@ -166,10 +176,6 @@ struct Day17: DayCommand {
             case .left:
                 Translation2D(deltaX: -1, deltaY: 0)
             }
-        }
-        
-        func availableDirections() -> [Direction] {
-            [rotatedLeft(), self, rotatedRight()]
         }
     }
 }
