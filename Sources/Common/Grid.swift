@@ -27,8 +27,8 @@ struct Grid<Value> {
     }
 }
 
-extension Grid where Value: RawRepresentable, Value.RawValue == Character {
-    init(rawValue: String) {
+extension Grid {
+    init(rawValue: String, valueForCharacter: @escaping (Character) -> Value?) {
         let lines = rawValue.components(separatedBy: .newlines)
         
         var size = Size2D(width: 0, height: lines.count)
@@ -38,7 +38,7 @@ extension Grid where Value: RawRepresentable, Value.RawValue == Character {
             size.width = max(size.width, line.count)
             
             for (x, character) in line.enumerated() {
-                guard let value = Value(rawValue: character) else {
+                guard let value = valueForCharacter(character) else {
                     continue
                 }
                 
@@ -50,6 +50,12 @@ extension Grid where Value: RawRepresentable, Value.RawValue == Character {
         self.valuesByPosition = valuesByPosition
         self.origin = .zero
         self.size = size
+    }
+}
+
+extension Grid where Value: RawRepresentable, Value.RawValue == Character {
+    init(rawValue: String) {
+        self.init(rawValue: rawValue, valueForCharacter: Value.init)
     }
 }
 
