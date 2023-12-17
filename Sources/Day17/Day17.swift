@@ -1,6 +1,6 @@
 //
 //  Day17.swift
-//  
+//
 //
 //  Created by Marc-Antoine Malépart on 2023-12-17.
 //
@@ -25,21 +25,68 @@ struct Day17: DayCommand {
         let grid = Grid<Int>(rawValue: try readFile(), valueForCharacter: { Int(String($0)) })
         
         printTitle("Part 1", level: .title1)
-        let leastHeatLoss = part1(grid: grid)
-        print("Least heat lost incurred from start to end:", leastHeatLoss)
+        let leastHeatLossWithCrucibles = part1(grid: grid)
+        print(
+            "Least heat lost incurred from start to end with crucibles:",
+            leastHeatLossWithCrucibles,
+            terminator: "\n\n"
+        )
+        
+        printTitle("Part 2", level: .title1)
+        let leastHeatLossWithUltraCrucibles = part2(grid: grid)
+        print("Least heat lost incurred from start to end with ultra crucibles:", leastHeatLossWithUltraCrucibles)
     }
     
     func part1(grid: Grid<Int>) -> Int {
         let start = grid.origin
         let end = Point2D(x: grid.maxX, y: grid.maxY)
         
-        return leastHeatLoss(from: start, to: end, in: grid)
+        return leastHeatLoss(
+            from: start,
+            to: end,
+            in: grid, 
+            availableDirectionsForState: { state in
+                var availableMoves: [Direction] = [state.direction.rotatedLeft()]
+                if state.distanceWithoutTurning < 3 {
+                    availableMoves.append(state.direction)
+                }
+                availableMoves.append(state.direction.rotatedRight())
+                return availableMoves
+            }
+        )
+    }
+    
+    func part2(grid: Grid<Int>) -> Int {
+        let start = grid.origin
+        let end = Point2D(x: grid.maxX, y: grid.maxY)
+        
+        return leastHeatLoss(
+            from: start,
+            to: end,
+            in: grid,
+            availableDirectionsForState: { state in
+                if state.distanceWithoutTurning < 4 {
+                    return [state.direction]
+                }
+                
+                if state.distanceWithoutTurning < 10 {
+                    return [
+                        state.direction.rotatedLeft(),
+                        state.direction,
+                        state.direction.rotatedRight()
+                    ]
+                }
+                
+                return [state.direction.rotatedLeft(), state.direction.rotatedRight()]
+            }
+        )
     }
     
     private func leastHeatLoss(
         from start: Point2D,
         to end: Point2D,
-        in grid: Grid<Int>
+        in grid: Grid<Int>,
+        availableDirectionsForState: @escaping (State) -> [Direction]
     ) -> Int {
         struct Node: Comparable {
             let state: State
@@ -64,12 +111,6 @@ struct Day17: DayCommand {
             }
         }
         
-        struct State: Hashable {
-            let position: Point2D
-            let direction: Direction
-            let distanceWithoutTurning: Int
-        }
-        
         let firstStates = [
             State(position: start, direction: .right, distanceWithoutTurning: 1),
             State(position: start, direction: .down, distanceWithoutTurning: 1)
@@ -83,22 +124,22 @@ struct Day17: DayCommand {
             frontier.insert(node)
         }
         
-    outer: while let current = frontier.popMin() {
+        while let current = frontier.popMin() {
             if current.position == end {
                 return current.cost
             }
             
             let (newlyVisited, _) = visited.insert(current.state)
             if !newlyVisited {
-                continue outer
+                continue
             }
             
-            let availableDirections = current.availableDirections()
-            inner: for direction in availableDirections {
+            let availableDirections = availableDirectionsForState(current.state)
+            for direction in availableDirections {
                 let neighbor = current.position.applying(direction.translation)
                 
                 guard let cost = grid.valuesByPosition[neighbor] else {
-                    continue inner
+                    continue
                 }
                 
                 let distanceWithoutTurning = if direction == current.direction {
@@ -119,7 +160,7 @@ struct Day17: DayCommand {
                 )
                 
                 if let previousCost = costByState[state], previousCost < node.cost {
-                    continue inner
+                    continue
                 }
                 
                 costByState[state] = node.cost
@@ -128,6 +169,12 @@ struct Day17: DayCommand {
         }
         
         fatalError("Could not find path from \(start) to \(end)")
+    }
+    
+    struct State: Hashable {
+        let position: Point2D
+        let direction: Direction
+        let distanceWithoutTurning: Int
     }
     
     enum Direction: Hashable, CaseIterable {
@@ -139,26 +186,26 @@ struct Day17: DayCommand {
         func rotatedLeft() -> Direction {
             switch self {
             case .up:
-                .left
+                    .left
             case .right:
-                .up
+                    .up
             case .down:
-                .right
+                    .right
             case .left:
-                .down
+                    .down
             }
         }
         
         func rotatedRight() -> Direction {
             switch self {
             case .up:
-                .right
+                    .right
             case .right:
-                .down
+                    .down
             case .down:
-                .left
+                    .left
             case .left:
-                .up
+                    .up
             }
         }
         
@@ -177,5 +224,6 @@ struct Day17: DayCommand {
                 Translation2D(deltaX: -1, deltaY: 0)
             }
         }
+        
     }
 }
