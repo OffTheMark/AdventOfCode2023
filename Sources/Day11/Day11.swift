@@ -133,8 +133,3 @@ struct Day11: DayCommand {
         let yCoordinates: Set<Int>
     }
 }
-
-struct Size2D: Hashable {
-    var width: Int
-    var height: Int
-}

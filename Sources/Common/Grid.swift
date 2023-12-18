@@ -116,4 +116,17 @@ struct Translation2D: Hashable {
     static let downLeft = Self(deltaX: -1, deltaY: 1)
     static let left = Self(deltaX: -1, deltaY: 0)
     static let upLeft = Self(deltaX: -1, deltaY: -1)
+    
+    static func * (lhs: Self, rhs: Int) -> Self {
+        Self(deltaX: lhs.deltaX * rhs, deltaY: lhs.deltaY * rhs)
+    }
+}
+
+// MARK: - Size2D
+
+struct Size2D: Hashable {
+    var width: Int
+    var height: Int
+    
+    static let zero = Self(width: 0, height: 0)
 }
