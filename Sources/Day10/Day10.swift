@@ -25,17 +25,24 @@ struct Day10: DayCommand {
         let graph = parse(try readLines())
         
         printTitle("Part 1", level: .title1)
-        let stepsToFarthestPoint = part1(graph: graph)
+        let (stepsToFarthestPoint, loop) = part1(graph: graph)
         print(
             "Steps from the starting position to the pointest farthest from the starting position:",
             stepsToFarthestPoint,
             terminator: "\n\n"
         )
+        
+        printTitle("Part 2", level: .title1)
+        let enclosedTileCount = part2(graph: graph, loop: loop)
+        print("Number of enclosed tiles:", enclosedTileCount)
     }
     
     private func parse(_ lines: [String]) -> Graph {
+        var size = Size2D(width: 0, height: lines.count)
         let map = lines.enumerated().reduce(into: [Point2D: Pipe](), { map, pair in
             let (y, line) = pair
+            
+            size.width = max(size.width, line.count)
             
             for (x, character) in line.enumerated() {
                 guard let pipe = Pipe(rawValue: character) else {
@@ -46,10 +53,10 @@ struct Day10: DayCommand {
                 map[point] = pipe
             }
         })
-        return Graph(map: map)
+        return Graph(map: map, size: size)
     }
     
-    func part1(graph: Graph) -> Int {
+    func part1(graph: Graph) -> (distance: Int, loop: [Point2D]) {
         let start = graph.map
             .first(where: { _, pipe in
                 pipe == .startingPosition
@@ -57,7 +64,43 @@ struct Day10: DayCommand {
             .key
         let loop = depthFirstSearch(from: start, to: start, graph: graph)
         
-        return loop.count / 2
+        return (loop.count / 2, loop)
+    }
+    
+    func part2(graph: Graph, loop: [Point2D]) -> Int {
+        // Based on OskarSigvardsson's Python solution
+        // https://github.com/OskarSigvardsson/adventofcode/blob/master/2023/day10/day10.py
+        
+        let pointsInLoop = Set(loop)
+        let rows = 0 ..< graph.size.height
+        let columns = 0 ..< graph.size.width
+        return rows.reduce(into: 0, { insideCount, y in
+            for x in columns {
+                let point = Point2D(x: x, y: y)
+                
+                if pointsInLoop.contains(point) {
+                    continue
+                }
+                
+                var crosses = 0
+                var other = point
+                
+                while rows.contains(other.y), columns.contains(other.x) {
+                    if pointsInLoop.contains(other),
+                       graph.map[other] != .northEastBend,
+                       graph.map[other] != .southWestBend {
+                        crosses += 1
+                    }
+                    
+                    other.x += 1
+                    other.y += 1
+                }
+                
+                if !crosses.isMultiple(of: 2) {
+                    insideCount += 1
+                }
+            }
+        })
     }
     
     private func depthFirstSearch(
@@ -151,8 +194,9 @@ struct Day10: DayCommand {
     struct Graph {
         let map: [Point2D: Pipe]
         let adjacentPointsByPoint: [Point2D: Set<Point2D>]
+        let size: Size2D
         
-        init(map: [Point2D: Pipe]) {
+        init(map: [Point2D: Pipe], size: Size2D) {
             self.map = map
             self.adjacentPointsByPoint = map.reduce(into: [:], { result, pair in
                 let (point, pipe) = pair
@@ -164,6 +208,7 @@ struct Day10: DayCommand {
                     return neighboringPipe.connections(for: neighbor).contains(point)
                 })
             })
+            self.size = size
         }
     }
 }
