@@ -56,7 +56,6 @@ struct Day19: DayCommand {
             
             while case .workflow(let workflowName) = currentDestination {
                 let workflow = workflowsByName[workflowName]!
-                
                 currentDestination = workflow.destination(for: part)
             }
             
@@ -448,7 +447,7 @@ extension ClosedRange {
         let maximumLowerBound = Swift.max(lowerBound, other.lowerBound)
         let minimumUpperBound = Swift.min(upperBound, other.upperBound)
         
-        let lowerBeforeUpper = maximumLowerBound <= upperBound && maximumLowerBound < other.upperBound
+        let lowerBeforeUpper = maximumLowerBound <= upperBound && maximumLowerBound <= other.upperBound
         let upperBeforeLower = minimumUpperBound >= lowerBound && minimumUpperBound >= other.lowerBound
         
         guard lowerBeforeUpper, upperBeforeLower else {
