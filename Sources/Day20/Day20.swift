@@ -22,12 +22,7 @@ struct Day20: DayCommand {
     var puzzleInputPath: String
     
     func run() throws {
-        let modulesByName: [String: CommunicationModuleVariant] = try readLines()
-            .compactMap(CommunicationModuleVariant.init)
-            .reduce(into: [:], { result, module in
-                result[module.name] = module
-            }
-        )
+        let modulesByName = parse(try readLines())
         
         printTitle("Part 1", level: .title1)
         let productOfLowAndHighPulses = part1(modulesByName: modulesByName)
@@ -38,41 +33,57 @@ struct Day20: DayCommand {
         )
     }
     
+    private func parse(_ lines: [String]) -> [String: CommunicationModuleVariant] {
+        var modulesByName: [String: CommunicationModuleVariant] = lines
+            .compactMap(CommunicationModuleVariant.init)
+            .reduce(into: [:], { result, module in
+                result[module.name] = module
+            }
+        )
+        for (name, module) in modulesByName {
+            for connection in module.outputConnections {
+                modulesByName[connection]?.addInputConnection(name)
+            }
+        }
+        
+        return modulesByName
+    }
+    
     private func part1(modulesByName: [String: CommunicationModuleVariant]) -> Int {
         var modulesByName = modulesByName
         
-        struct Input {
+        struct Signal {
             let source: String
             let pulse: Pulse
-            let connection: String
+            let destination: String
         }
         var sentCountsByPulse = [Pulse: Int]()
         
         for _ in 0 ..< 1_000 {
-            var queue: Deque = [Input(source: "button", pulse: .low, connection: "broadcaster")]
+            var queue: Deque = [Signal(source: "button", pulse: .low, destination: "broadcaster")]
             
-            while let input = queue.popFirst() {
-                sentCountsByPulse[input.pulse, default: 0] += 1
+            while let signal = queue.popFirst() {
+                sentCountsByPulse[signal.pulse, default: 0] += 1
                 
-                if input.connection == "output" {
+                if signal.destination == "output" {
                     continue
                 }
                 
-                guard var module = modulesByName[input.connection] else {
+                guard var module = modulesByName[signal.destination] else {
                     continue
                 }
                 
-                guard let output = module.process(input.pulse, from: input.source) else {
-                    modulesByName[input.connection] = module
+                guard let output = module.process(signal.pulse, from: signal.source) else {
+                    modulesByName[signal.destination] = module
                     continue
                 }
                 
-                let moduleOutputs: [Input] = module.connections.map({ connection in
-                    Input(source: module.name, pulse: output, connection: connection)
+                let moduleOutputs: [Signal] = module.outputConnections.map({ connection in
+                    Signal(source: module.name, pulse: output, destination: connection)
                 })
                 
                 queue.append(contentsOf: moduleOutputs)
-                modulesByName[input.connection] = module
+                modulesByName[signal.destination] = module
             }
         }
         
@@ -96,14 +107,42 @@ private enum CommunicationModuleVariant: CommunicationModule {
         }
     }
     
-    var connections: [String] {
+    var outputConnections: [String] {
         switch self {
         case .broadcast(let module):
-            module.connections
+            module.outputConnections
         case .flipFlop(let module):
-            module.connections
+            module.outputConnections
         case .conjunction(let module):
-            module.connections
+            module.outputConnections
+        }
+    }
+    
+    var inputConnections: Set<String> {
+        get {
+            switch self {
+            case .broadcast(let module):
+                module.inputConnections
+            case .flipFlop(let module):
+                module.inputConnections
+            case .conjunction(let module):
+                module.inputConnections
+            }
+        }
+        set {
+            switch self {
+            case .broadcast(var module):
+                module.inputConnections = newValue
+                self = .broadcast(module)
+                
+            case .flipFlop(var module):
+                module.inputConnections = newValue
+                self = .flipFlop(module)
+                
+            case .conjunction(var module):
+                module.inputConnections = newValue
+                self = .conjunction(module)
+            }
         }
     }
     
@@ -123,6 +162,22 @@ private enum CommunicationModuleVariant: CommunicationModule {
             let result = module.process(pulse, from: input)
             self = .conjunction(module)
             return result
+        }
+    }
+    
+    mutating func addInputConnection(_ connection: String) {
+        switch self {
+        case .broadcast(var module):
+            module.addInputConnection(connection)
+            self = .broadcast(module)
+            
+        case .flipFlop(var module):
+            module.addInputConnection(connection)
+            self = .flipFlop(module)
+            
+        case .conjunction(var module):
+            module.addInputConnection(connection)
+            self = .conjunction(module)
         }
     }
 }
@@ -162,7 +217,8 @@ extension CommunicationModuleVariant {
 
 private struct BroadcastModule: CommunicationModule {
     let name: String
-    let connections: [String]
+    let outputConnections: [String]
+    var inputConnections: Set<String> = []
     
     func process(_ pulse: Pulse, from input: String) -> Pulse? {
         pulse
@@ -177,13 +233,14 @@ extension BroadcastModule {
         }
         
         self.name = parts[0]
-        self.connections = parts[1].components(separatedBy: ", ").map({ $0.removingPrefix("%").removingPrefix("&") })
+        self.outputConnections = parts[1].components(separatedBy: ", ")
     }
 }
 
 private struct FlipFlopModule: CommunicationModule {
     let name: String
-    let connections: [String]
+    let outputConnections: [String]
+    var inputConnections: Set<String> = []
     
     var isOn = false
     
@@ -214,20 +271,21 @@ extension FlipFlopModule {
         }
         
         self.name = parts[0].removingPrefix("%")
-        self.connections = parts[1].components(separatedBy: ", ").map({ $0.removingPrefix("%").removingPrefix("&") })
+        self.outputConnections = parts[1].components(separatedBy: ", ")
     }
 }
 
 private struct ConjuctionModule: CommunicationModule {
     let name: String
-    let connections: [String]
+    let outputConnections: [String]
+    var inputConnections: Set<String> = []
     
     var lastPulseByInput = [String: Pulse]()
     
     mutating func process(_ pulse: Pulse, from input: String) -> Pulse? {
         lastPulseByInput[input] = pulse
         
-        let highPulseForAllInputs = lastPulseByInput.allSatisfy({ $0.value == .high })
+        let highPulseForAllInputs = inputConnections.allSatisfy({ lastPulseByInput[$0, default: .low] == .high })
         return if highPulseForAllInputs {
             .low
         }
@@ -245,14 +303,22 @@ extension ConjuctionModule {
         }
         
         self.name = parts[0].removingPrefix("&")
-        self.connections = parts[1].components(separatedBy: ", ").map({ $0.removingPrefix("%").removingPrefix("&") })
+        self.outputConnections = parts[1].components(separatedBy: ", ")
     }
 }
 
 private protocol CommunicationModule {
-    var connections: [String] { get }
+    var inputConnections: Set<String> { get set }
+    var outputConnections: [String] { get }
     
+    mutating func addInputConnection(_ connection: String)
     mutating func process(_ pulse: Pulse, from input: String) -> Pulse?
+}
+
+extension CommunicationModule {
+    mutating func addInputConnection(_ connection: String) {
+        inputConnections.insert(connection)
+    }
 }
 
 private enum Pulse {
