@@ -31,6 +31,11 @@ struct Day20: DayCommand {
             productOfLowAndHighPulses,
             terminator: "\n\n"
         )
+        
+        printTitle("Part 2", level: .title1)
+        printTitle("PlantUML", level: .title2)
+        let plantUMLDiagram = plantUMLDiagram(modulesByName: modulesByName)
+        print(plantUMLDiagram)
     }
     
     private func parse(_ lines: [String]) -> [String: CommunicationModuleVariant] {
@@ -52,11 +57,6 @@ struct Day20: DayCommand {
     private func part1(modulesByName: [String: CommunicationModuleVariant]) -> Int {
         var modulesByName = modulesByName
         
-        struct Signal {
-            let source: String
-            let pulse: Pulse
-            let destination: String
-        }
         var sentCountsByPulse = [Pulse: Int]()
         
         for _ in 0 ..< 1_000 {
@@ -88,6 +88,41 @@ struct Day20: DayCommand {
         }
         
         return sentCountsByPulse[.low, default: 0] * sentCountsByPulse[.high, default: 0]
+    }
+    
+    private func plantUMLDiagram(modulesByName: [String: CommunicationModuleVariant]) -> String {
+        var result = """
+        @startuml
+        hide empty members
+        
+        """
+        
+        let sortedModulesByName = modulesByName.sorted(by: { $0.key < $1.key })
+        for (name, module) in sortedModulesByName {
+            let definition = switch module {
+            case .broadcast:
+                "abstract \(name) << (B,lime) broadcast >>"
+                
+            case .conjunction:
+                "class \(name) << (C,royalblue) conjunction >>"
+                
+            case .flipFlop:
+                "interface \(name) << (F,orangered) flip flop >>"
+            }
+            
+            result.append("\(definition)\n")
+        }
+        
+        for (name, module) in sortedModulesByName {
+            let outputs = module.outputConnections.sorted()
+            
+            for output in outputs {
+                result.append("\(name) --> \(output)\n")
+            }
+        }
+        
+        result.append("@enduml")
+        return result
     }
 }
 
@@ -324,4 +359,10 @@ extension CommunicationModule {
 private enum Pulse {
     case low
     case high
+}
+
+private struct Signal {
+    let source: String
+    let pulse: Pulse
+    let destination: String
 }
