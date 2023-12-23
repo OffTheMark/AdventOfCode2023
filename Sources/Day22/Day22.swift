@@ -8,6 +8,7 @@
 import Foundation
 import AdventOfCodeUtilities
 import ArgumentParser
+import Collections
 import RegexBuilder
 
 struct Day22: DayCommand {
@@ -22,38 +23,64 @@ struct Day22: DayCommand {
     var puzzleInputPath: String
     
     func run() throws {
-        let bricks = try readLines().compactMap(Brick.init)
+        let bricks = parse(try readLines())
         
         printTitle("Part 1", level: .title1)
-        let numberOfDisintegratedBricks = part1(bricks: bricks)
+        let (numberOfDisintegratedBricks, pile) = part1(bricks: bricks)
         print("Number of safely disintegrated bricks:", numberOfDisintegratedBricks, terminator: "\n\n")
+        
+        printTitle("Part 2", level: .title1)
+        let sumOfOtherFallingBricks = part2(pile: pile)
+        print("What is the sum of the number of other bricks that would fall?", sumOfOtherFallingBricks)
     }
     
-    private func part1(bricks: [Brick]) -> Int {
-        var placedBricksByID = [Int: Brick]()
-        var bricksByZ = [Int: Set<Int>]()
-        var supportingBricksByID = [Int: Set<Int>]()
-        var dependantBricksByID = [Int: Set<Int>]()
-        
-        func placeBrick(_ brick: Brick, withID id: Int) {
-            placedBricksByID[id] = brick
-            brick.zRange.forEach({ z in
-                bricksByZ[z, default: []].insert(id)
-            })
+    private func parse(_ lines: [String]) -> [Brick] {
+        let regex = Regex {
+            let number = TryCapture {
+                OneOrMore(.digit)
+            } transform: {
+                Int(String($0))
+            }
+            
+            number
+            ","
+            number
+            ","
+            number
+            "~"
+            number
+            ","
+            number
+            ","
+            number
         }
         
-        for (id, brick) in bricks.enumerated().sorted(by: { $0.element.start.z < $1.element.start.z }) {
+        return lines.enumerated().compactMap({ id, line in
+            guard let match = line.firstMatch(of: regex) else {
+                return nil
+            }
+            
+            let start = Point3D(x: match.output.1, y: match.output.2, z: match.output.3)
+            let end = Point3D(x: match.output.4, y: match.output.5, z: match.output.6)
+            return Brick(id: id, start: start, end: end)
+        })
+    }
+    
+    private func part1(bricks: [Brick]) -> (result: Int, pile: Pile) {
+        var pile = Pile()
+        var bricksByZ = [Int: Set<Brick>]()
+    
+        for brick in bricks.sorted(by: { $0.start.z < $1.start.z }) {
             let zCandidates = 1 ..< brick.start.z
             
             var previousZ = 0
-            var supports = Set<Int>()
+            var supports = Set<Brick>()
             for z in zCandidates.sorted(by: >) {
                 guard let bricksAtZ = bricksByZ[z] else {
                     continue
                 }
                 
-                supports = bricksAtZ.filter({ id in
-                    let placedBrick = placedBricksByID[id]!
+                supports = bricksAtZ.filter({ placedBrick in
                     return placedBrick.xRange.overlaps(brick.xRange) && placedBrick.yRange.overlaps(brick.yRange)
                 })
                 
@@ -65,33 +92,93 @@ struct Day22: DayCommand {
         
             let translation = Translation3D(deltaX: 0, deltaY: 0, deltaZ: previousZ - brick.start.z + 1)
             let translated = brick.applying(translation)
-            placedBricksByID[id] = translated
+            pile.placeBrick(translated, supportedBy: supports)
+            
             translated.zRange.forEach({ z in
-                bricksByZ[z, default: []].insert(id)
+                bricksByZ[z, default: []].insert(translated)
             })
-            
-            supportingBricksByID[id, default: []].formUnion(supports)
-            
-            for support in supports {
-                dependantBricksByID[support, default: []].insert(id)
-            }
         }
         
-        return placedBricksByID.keys.count(where: { currentID in
-            let dependants = dependantBricksByID[currentID, default: []]
+        let result = pile.bricks.count(where: { brick in
+            let dependants = pile.dependants(for: brick)
+            
             if dependants.isEmpty {
                 return true
             }
             
-            return dependants.allSatisfy({ dependantID in
-                let supportingBricks = supportingBricksByID[dependantID, default: []]
-                return supportingBricks.count >= 2
+            return dependants.allSatisfy({ dependant in
+                pile.supports(for: dependant).count >= 2
             })
+        })
+        return (result, pile)
+    }
+    
+    private func part2(pile: Pile) -> Int {
+        pile.bricks.reduce(into: 0, { sum, brick in
+            var pile = pile
+            var fallenBricks = Set<Brick>()
+            var queue: Deque<Brick> = [brick]
+            
+            while let current = queue.popFirst() {
+                let dependants = pile.dependants(for: current)
+                
+                pile.removeBrick(current)
+                fallenBricks.insert(current)
+                
+                for dependant in dependants {
+                    let supports = pile.supports(for: dependant)
+                    
+                    if !fallenBricks.contains(dependant), supports.isEmpty {
+                        queue.append(dependant)
+                    }
+                }
+            }
+            
+            sum += fallenBricks.subtracting([brick]).count
         })
     }
 }
 
-private struct Brick {
+private struct Pile {
+    var bricks = Set<Brick>()
+    var dependantBricksByBrick = [Brick: Set<Brick>]()
+    var supportingBricksByBrick = [Brick: Set<Brick>]()
+    
+    func supports(for brick: Brick) -> Set<Brick> {
+        supportingBricksByBrick[brick, default: []]
+    }
+    
+    func dependants(for brick: Brick) -> Set<Brick> {
+        dependantBricksByBrick[brick, default: []]
+    }
+    
+    mutating func placeBrick(_ brick: Brick, supportedBy supports: Set<Brick>) {
+        bricks.insert(brick)
+        supportingBricksByBrick[brick] = supports
+        for support in supports {
+            dependantBricksByBrick[support, default: []].insert(brick)
+        }
+    }
+    
+    mutating func removeBrick(_ brick: Brick) {
+        bricks.remove(brick)
+        
+        let dependants = dependants(for: brick)
+        for dependant in dependants {
+            supportingBricksByBrick[dependant, default: []].remove(brick)
+        }
+        dependantBricksByBrick.removeValue(forKey: brick)
+        
+        let supports = supports(for: brick)
+        for support in supports {
+            dependantBricksByBrick[support, default: []].remove(brick)
+        }
+        supportingBricksByBrick.removeValue(forKey: brick)
+    }
+}
+
+private struct Brick: Hashable {
+    let id: Int
     let start: Point3D
     let end: Point3D
     
@@ -104,37 +191,10 @@ private struct Brick {
     }
     
     func applying(_ translation: Translation3D) -> Self {
-        Self(start: start.applying(translation), end: end.applying(translation))
-    }
-}
-
-extension Brick {
-    static let regex = Regex {
-        let number = TryCapture {
-            OneOrMore(.digit)
-        } transform: {
-            Int(String($0))
-        }
-        
-        number
-        ","
-        number
-        ","
-        number
-        "~"
-        number
-        ","
-        number
-        ","
-        number
-    }
-    
-    init?(rawValue: String) {
-        guard let match = rawValue.firstMatch(of: Self.regex) else {
-            return nil
-        }
-        
-        self.start = Point3D(x: match.output.1, y: match.output.2, z: match.output.3)
-        self.end = Point3D(x: match.output.4, y: match.output.5, z: match.output.6)
+        Self(
+            id: id,
+            start: start.applying(translation),
+            end: end.applying(translation)
+        )
     }
 }
